@@ -1,30 +1,43 @@
+import { useTranslation } from "react-i18next";
 import { Milk, Moon, NotebookTabs } from "lucide-react";
 
-const summaryCards = [
-  {
-    label: "Сън днес",
-    value: "11ч 42м",
-    icon: Moon,
-    accent: "bg-indigo-100 text-indigo-700",
-  },
-  {
-    label: "Хранения",
-    value: "7",
-    icon: Milk,
-    accent: "bg-emerald-100 text-emerald-700",
-  },
-  {
-    label: "Пелени",
-    value: "5",
-    icon: NotebookTabs,
-    accent: "bg-amber-100 text-amber-700",
-  },
-];
+import { useActivityStore } from "../../store/activityStore";
+import {
+  calculateTodaySleep,
+  countTodayActivities,
+  formatDuration,
+} from "../../features/dashboard/utils/dashboardStats";
 
 export default function SummaryCards() {
+  const { t } = useTranslation();
+  const activities = useActivityStore((state) => state.activities);
+
+  const cards = [
+    {
+      label: t("dashboard.todaySleep"),
+      value: formatDuration(calculateTodaySleep(activities)),
+      icon: Moon,
+      accent: "bg-indigo-100 text-indigo-700",
+    },
+    {
+      label: t("dashboard.feedings"),
+      value: String(
+        countTodayActivities(activities, ["breastfeeding", "bottle"]),
+      ),
+      icon: Milk,
+      accent: "bg-emerald-100 text-emerald-700",
+    },
+    {
+      label: t("dashboard.diapers"),
+      value: String(countTodayActivities(activities, ["diaper"])),
+      icon: NotebookTabs,
+      accent: "bg-amber-100 text-amber-700",
+    },
+  ];
+
   return (
     <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {summaryCards.map(({ label, value, icon: Icon, accent }) => (
+      {cards.map(({ label, value, icon: Icon, accent }) => (
         <article
           key={label}
           className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md"

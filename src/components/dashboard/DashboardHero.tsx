@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Baby,
   BrainCircuit,
@@ -8,8 +9,10 @@ import {
   Sparkles,
 } from "lucide-react";
 
-function formatClock(date: Date) {
-  return new Intl.DateTimeFormat("bg-BG", {
+import { useBabyStore } from "../../store/babyStore";
+
+function formatClock(date: Date, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -27,8 +30,28 @@ function formatCountdown(totalSeconds: number) {
     .join(":");
 }
 
+function formatMinutesDuration(totalMinutes: number, language: string) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (language === "bg") {
+    return `${hours}ч ${minutes}м`;
+  }
+
+  return `${hours}h ${minutes}m`;
+}
+
 export default function DashboardHero() {
+  const { t, i18n } = useTranslation();
+
+  const { babies, selectedBabyId } = useBabyStore();
+
+  const selectedBaby =
+    babies.find((baby) => baby.id === selectedBabyId) ?? babies[0];
+
   const [now, setNow] = useState(() => new Date());
+
+  const wakeWindowMinutes = 88;
 
   const nextNapAt = useMemo(() => {
     const target = new Date();
@@ -68,34 +91,50 @@ export default function DashboardHero() {
           </div>
 
           <p className="mt-6 text-sm font-medium text-indigo-100">
-            Добър вечер, Милен 👋
+            {t("dashboard.hero.greeting", { name: "Милен" })}
           </p>
 
           <h1 className="mt-2 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
-            Алекс е в добър ритъм днес.
+            {t("dashboard.hero.title", {
+              babyName: selectedBaby.name,
+            })}
           </h1>
 
           <p className="mt-3 max-w-xl text-sm leading-6 text-indigo-100 sm:text-base">
-            Следващият оптимален прозорец за сън наближава. Подготви спокойна
-            рутина малко преди прогнозирания час.
+            {t("dashboard.hero.subtitle")}
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
             <div className="flex items-center gap-3 rounded-2xl bg-white/12 px-4 py-3 backdrop-blur">
               <Clock3 className="h-5 w-5 text-indigo-100" />
               <div>
-                <p className="text-xs text-indigo-100">Текущ час</p>
+                <p className="text-xs text-indigo-100">
+                  {t("dashboard.hero.currentTime")}
+                </p>
+
                 <p className="font-mono text-lg font-semibold">
-                  {formatClock(now)}
+                  {formatClock(
+                    now,
+                    i18n.language === "bg" ? "bg-BG" : "en-GB",
+                  )}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-3 rounded-2xl bg-white/12 px-4 py-3 backdrop-blur">
               <Baby className="h-5 w-5 text-indigo-100" />
+
               <div>
-                <p className="text-xs text-indigo-100">Детето е будно</p>
-                <p className="text-lg font-semibold">1ч 28м</p>
+                <p className="text-xs text-indigo-100">
+                  {t("dashboard.hero.babyAwake")}
+                </p>
+
+                <p className="text-lg font-semibold">
+                  {formatMinutesDuration(
+                    wakeWindowMinutes,
+                    i18n.language,
+                  )}
+                </p>
               </div>
             </div>
           </div>
@@ -106,8 +145,9 @@ export default function DashboardHero() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-slate-500">
-                  Следващ сън след
+                  {t("dashboard.hero.nextSleep")}
                 </p>
+
                 <p className="mt-2 font-mono text-3xl font-bold tracking-tight text-indigo-700">
                   {formatCountdown(countdownSeconds)}
                 </p>
@@ -119,12 +159,15 @@ export default function DashboardHero() {
             </div>
 
             <p className="mt-4 text-sm leading-5 text-slate-500">
-              Препоръчително начало около{" "}
+              {t("dashboard.hero.recommendedStart")}{" "}
               <span className="font-semibold text-slate-800">
-                {new Intl.DateTimeFormat("bg-BG", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                }).format(nextNapAt)}
+                {new Intl.DateTimeFormat(
+                  i18n.language === "bg" ? "bg-BG" : "en-GB",
+                  {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  },
+                ).format(nextNapAt)}
               </span>
             </p>
           </article>
@@ -133,9 +176,12 @@ export default function DashboardHero() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-slate-400">
-                  AI увереност
+                  {t("dashboard.hero.aiConfidence")}
                 </p>
-                <p className="mt-2 text-3xl font-bold tracking-tight">89%</p>
+
+                <p className="mt-2 text-3xl font-bold tracking-tight">
+                  89%
+                </p>
               </div>
 
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/20 text-violet-300">
@@ -144,8 +190,7 @@ export default function DashboardHero() {
             </div>
 
             <p className="mt-4 text-sm leading-5 text-slate-400">
-              Прогнозата използва последните записи за сън и възрастта на
-              детето.
+              {t("dashboard.hero.aiDescription")}
             </p>
           </article>
         </div>

@@ -1,0 +1,61 @@
+{
+  "dashboard": {
+    "hero": {
+  "greeting": "Good evening, {{name}} 👋",
+  "title": "{{babyName}} is in a good rhythm today.",
+  "subtitle": "The next optimal sleep window is approaching. Start a calm routine shortly before the predicted time.",
+  "currentTime": "Current time",
+  "babyAwake": "Baby has been awake",
+  "nextSleep": "Next sleep in",
+  "recommendedStart": "Recommended start around",
+  "aiConfidence": "AI confidence",
+  "aiDescription": "The prediction uses the latest sleep records and the baby's age."
+},
+    "welcome": "Good evening",
+    "heroTitle": "Everything important about your baby's day in one place.",
+    "heroSubtitle": "Track sleep, feeding and daily activities without the complexity.",
+
+    "todaySleep": "Today's Sleep",
+    "feedings": "Feedings",
+    "diapers": "Diapers",
+
+    "quickActions": "Quick Actions",
+    "whatToTrack": "What would you like to track?"
+  },
+
+  "sleep": {
+    "title": "Sleep Tracker",
+    "awake": "Baby is awake",
+    "sleeping": "Sleeping...",
+    "start": "Start Sleep",
+    "stop": "Stop Sleep"
+  },
+
+   "activity": {
+  "todayActivities": "Today's activities",
+  "todayHistory": "Daily history",
+  "empty": "There are no activities for today yet.",
+  "emptyDescription": "Start a sleep session to see the first record here.",
+  "sleep": "Sleep",
+  "duration": "Duration",
+  "active": "Active",
+  "delete": "Delete",
+  "deleteConfirmation": "Are you sure you want to delete this activity?",
+  "deleteActivity": "Delete activity"
+},
+"navigation": {
+  "dashboard": "Dashboard",
+  "sleep": "Sleep",
+  "feeding": "Feeding",
+  "growth": "Growth",
+  "health": "Health",
+  "settings": "Settings",
+  "familyAssistant": "Family assistant",
+  "premiumDescription": "AI insights, predictions and smart notifications."
+},
+"header": {
+  "searchPlaceholder": "Search activities...",
+  "changeTheme": "Change theme",
+  "notifications": "Notifications"
+}
+}
