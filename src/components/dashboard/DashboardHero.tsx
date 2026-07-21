@@ -9,6 +9,10 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import {
+  calculateBabyAge,
+  formatBabyAge,
+} from "../../features/baby/utils/babyAge";
 import { useBabyStore } from "../../store/babyStore";
 
 function formatClock(date: Date, locale: string) {
@@ -30,7 +34,10 @@ function formatCountdown(totalSeconds: number) {
     .join(":");
 }
 
-function formatMinutesDuration(totalMinutes: number, language: string) {
+function formatMinutesDuration(
+  totalMinutes: number,
+  language: string,
+) {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
@@ -44,7 +51,10 @@ function formatMinutesDuration(totalMinutes: number, language: string) {
 export default function DashboardHero() {
   const { t, i18n } = useTranslation();
 
-  const { babies, selectedBabyId } = useBabyStore();
+  const babies = useBabyStore((state) => state.babies);
+  const selectedBabyId = useBabyStore(
+    (state) => state.selectedBabyId,
+  );
 
   const selectedBaby =
     babies.find((baby) => baby.id === selectedBabyId) ?? babies[0];
@@ -59,6 +69,7 @@ export default function DashboardHero() {
     target.setMinutes(target.getMinutes() + 18);
     target.setSeconds(0);
     target.setMilliseconds(0);
+
     return target;
   }, []);
 
@@ -69,6 +80,15 @@ export default function DashboardHero() {
 
     return () => window.clearInterval(intervalId);
   }, []);
+
+  if (!selectedBaby) {
+    return null;
+  }
+
+  const age = calculateBabyAge(selectedBaby.birthday);
+
+  const locale =
+    i18n.language === "bg" ? "bg-BG" : "en-GB";
 
   const countdownSeconds = Math.floor(
     (nextNapAt.getTime() - now.getTime()) / 1000,
@@ -91,7 +111,9 @@ export default function DashboardHero() {
           </div>
 
           <p className="mt-6 text-sm font-medium text-indigo-100">
-            {t("dashboard.hero.greeting", { name: "Милен" })}
+            {t("dashboard.hero.greeting", {
+              name: "Милен",
+            })}
           </p>
 
           <h1 className="mt-2 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
@@ -104,19 +126,21 @@ export default function DashboardHero() {
             {t("dashboard.hero.subtitle")}
           </p>
 
+          <p className="mt-2 text-sm font-medium text-indigo-200">
+            {formatBabyAge(age, i18n.language)}
+          </p>
+
           <div className="mt-6 flex flex-wrap gap-3">
             <div className="flex items-center gap-3 rounded-2xl bg-white/12 px-4 py-3 backdrop-blur">
               <Clock3 className="h-5 w-5 text-indigo-100" />
+
               <div>
                 <p className="text-xs text-indigo-100">
                   {t("dashboard.hero.currentTime")}
                 </p>
 
                 <p className="font-mono text-lg font-semibold">
-                  {formatClock(
-                    now,
-                    i18n.language === "bg" ? "bg-BG" : "en-GB",
-                  )}
+                  {formatClock(now, locale)}
                 </p>
               </div>
             </div>
@@ -161,13 +185,10 @@ export default function DashboardHero() {
             <p className="mt-4 text-sm leading-5 text-slate-500">
               {t("dashboard.hero.recommendedStart")}{" "}
               <span className="font-semibold text-slate-800">
-                {new Intl.DateTimeFormat(
-                  i18n.language === "bg" ? "bg-BG" : "en-GB",
-                  {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  },
-                ).format(nextNapAt)}
+                {new Intl.DateTimeFormat(locale, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }).format(nextNapAt)}
               </span>
             </p>
           </article>

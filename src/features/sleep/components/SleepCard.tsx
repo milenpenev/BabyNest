@@ -1,7 +1,8 @@
-import { BedDouble, Play, Square } from "lucide-react";
+import { BedDouble, Pause, Play, Square } from "lucide-react";
+import { useTranslation } from "react-i18next";
+
 import { useActivityStore } from "../../../store/activityStore";
 import { useSleepTimer } from "../hooks/useSleepTimer";
-import { useTranslation } from "react-i18next";
 
 function formatDuration(seconds: number) {
   const hours = Math.floor(seconds / 3600);
@@ -19,8 +20,11 @@ export default function SleepCard() {
 
   const {
     isRunning,
+    isPaused,
     durationSeconds,
     startSleep,
+    pauseSleep,
+    resumeSleep,
     stopSleep,
   } = useSleepTimer();
 
@@ -33,7 +37,7 @@ export default function SleepCard() {
 
     addActivity({
       id: crypto.randomUUID(),
-      babyId: "alex",
+      babyId: "filip",
       type: "sleep",
       startedAt: session.startedAt.toISOString(),
       endedAt: session.endedAt.toISOString(),
@@ -45,6 +49,12 @@ export default function SleepCard() {
     });
   }
 
+  const statusText = !isRunning
+    ? t("sleep.awake")
+    : isPaused
+      ? t("sleep.paused")
+      : t("sleep.sleeping");
+
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center gap-3">
@@ -54,10 +64,11 @@ export default function SleepCard() {
 
         <div>
           <h3 className="text-lg font-semibold">
-          {t("sleep.title")}
+            {t("sleep.title")}
           </h3>
+
           <p className="text-sm text-slate-500">
-            {isRunning ? t("sleep.sleeping") : t("sleep.awake")}
+            {statusText}
           </p>
         </div>
       </div>
@@ -79,14 +90,30 @@ export default function SleepCard() {
             {t("sleep.start")}
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={handleStopSleep}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 py-3 font-semibold text-white transition hover:bg-rose-700"
-          >
-            <Square className="h-5 w-5" />
-            {t("sleep.stop")}
-          </button>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={isPaused ? resumeSleep : pauseSleep}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 py-3 font-semibold text-white transition hover:bg-amber-600"
+            >
+              {isPaused ? (
+                <Play className="h-5 w-5" />
+              ) : (
+                <Pause className="h-5 w-5" />
+              )}
+
+              {isPaused ? t("sleep.resume") : t("sleep.pause")}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleStopSleep}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 py-3 font-semibold text-white transition hover:bg-rose-700"
+            >
+              <Square className="h-5 w-5" />
+              {t("sleep.stop")}
+            </button>
+          </div>
         )}
       </div>
     </div>

@@ -28,7 +28,10 @@
     "awake": "Baby is awake",
     "sleeping": "Sleeping...",
     "start": "Start Sleep",
-    "stop": "Stop Sleep"
+    "stop": "Stop Sleep",
+    "paused": "Sleep is paused",
+    "pause": "Pause",
+    "resume": "Resume"
   },
 
    "activity": {
