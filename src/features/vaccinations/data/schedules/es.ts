@@ -1,0 +1,2 @@
+import{dose,schedule,series}from"./helpers";
+export const esSchedule=schedule("ES","ES-CISNS-2026.1","ES-MSCBS-2026",[...series("HEXA",[{months:2},{months:4},{months:11}]),...series("PCV",[{months:2},{months:4},{months:11}]),...series("ROTAVIRUS",[{months:2},{months:4}]),...series("MENB",[{months:2},{months:4},{months:12}]),dose("MENACWY",1,{months:12}),...series("MMR",[{months:12},{years:3}]),...series("VARICELLA",[{months:15},{years:3}]),dose("DTaPIPV",4,{years:6}),...series("HPV",[{years:12},{years:12}])],"mixed");

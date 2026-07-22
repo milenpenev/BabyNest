@@ -1,0 +1,2 @@
+import{dose,schedule,series}from"./helpers";
+export const beSchedule=schedule("BE","BE-2025.1","BE-FPS-2025",[...series("HEXA",[{weeks:8},{weeks:12},{weeks:16},{months:15}]),...series("PCV",[{weeks:8},{weeks:16},{months:12}]),...series("ROTAVIRUS",[{weeks:8},{weeks:12}]),dose("MENACWY",1,{months:15}),...series("MMR",[{months:12},{years:9}]),dose("DTaPIPV",5,{years:6}),...series("HPV",[{years:12},{years:12}])],"mixed");

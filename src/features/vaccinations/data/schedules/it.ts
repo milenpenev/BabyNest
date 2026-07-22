@@ -1,0 +1,2 @@
+import{dose,schedule,series}from"./helpers";
+export const itSchedule=schedule("IT","IT-PNPV-2023-2025.1","IT-MOH-PNPV",[...series("HEXA",[{months:3},{months:5},{months:11}]),...series("PCV",[{months:3},{months:5},{months:11}]),...series("ROTAVIRUS",[{months:2},{months:4}]),...series("MENB",[{months:3},{months:5},{months:7},{months:13}]),dose("MENACWY",1,{months:13}),...series("MMRV",[{months:13},{years:5}]),dose("DTaPIPV",4,{years:6}),...series("HPV",[{years:11},{years:11}]),dose("INFLUENZA",1,{months:6},"seasonal",{applicability:{requiresUserEnablement:true}})]);

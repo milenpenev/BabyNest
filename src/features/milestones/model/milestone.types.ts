@@ -1,0 +1,4 @@
+export type MilestoneDomain="gross-motor"|"fine-motor"|"communication"|"social-emotional"|"cognitive"|"feeding"|"self-care";
+export type MilestoneStatus="not-observed"|"emerging"|"observed"|"not-applicable"|"parent-concern";
+export interface MilestoneDefinition{id:string;domain:MilestoneDomain;titleKey:string;descriptionKey?:string;typicalWindow:{earliestAgeDays?:number;targetAgeDays?:number;latestAgeDays?:number};correctedAgeApplicable:boolean;sourceIds:string[];version:string;order:number;guidanceKey?:string}
+export interface BabyMilestoneRecord{id:string;babyId:string;milestoneId?:string;customTitle?:string;domain:MilestoneDomain;status:MilestoneStatus;observedAt?:string;firstNoticedAt?:string;note?:string;concernText?:string;includeInDoctorReport?:boolean;createdAt:string;updatedAt:string;source:"catalog"|"custom"}

@@ -1,0 +1,2 @@
+import{dose,schedule,series}from"./helpers";
+export const nlSchedule=schedule("NL","NL-RVP-2026.1","NL-RIVM-RVP-2026",[...series("HEXA",[{weeks:6},{months:3},{months:5},{months:11}]),...series("PCV",[{weeks:6},{months:3},{months:11}]),...series("ROTAVIRUS",[{weeks:6},{months:3}]),...series("MMR",[{months:14},{years:3}]),dose("MENACWY",1,{months:14}),dose("DTaPIPV",5,{years:5}),dose("HPV",1,{years:10})]);

@@ -1,0 +1,13 @@
+import type { Activity } from "../../../entities/activity/model/activity.types";
+import type { BabyRoutinePreferences } from "../../../entities/baby/model/baby.types";
+import { useSubscriptionStore } from "../../../store/subscriptionStore";
+import { filterOutliers, weightedAverage } from "../../sleep/prediction/wakeWindows";
+
+export const DEFAULT_ROUTINE_PREFERENCES:Required<BabyRoutinePreferences>={feedingIntervalMinutes:180,diaperIntervalMinutes:180,useAdaptiveFeedingInterval:false,useAdaptiveDiaperInterval:false};
+export const MIN_ROUTINE_INTERVAL_MINUTES=15; export const MAX_ROUTINE_INTERVAL_MINUTES=24*60;
+export const minutesToMilliseconds=(minutes:number)=>minutes*60_000;
+export function getRoutinePreferences(value?:BabyRoutinePreferences):Required<BabyRoutinePreferences>{const isPremium=useSubscriptionStore.getState().plan==="premium";return {feedingIntervalMinutes:value?.feedingIntervalMinutes??DEFAULT_ROUTINE_PREFERENCES.feedingIntervalMinutes,diaperIntervalMinutes:value?.diaperIntervalMinutes??DEFAULT_ROUTINE_PREFERENCES.diaperIntervalMinutes,useAdaptiveFeedingInterval:isPremium&&(value?.useAdaptiveFeedingInterval??false),useAdaptiveDiaperInterval:isPremium&&(value?.useAdaptiveDiaperInterval??false)}}
+export function isValidRoutineInterval(value:number){return Number.isFinite(value)&&value>=MIN_ROUTINE_INTERVAL_MINUTES&&value<=MAX_ROUTINE_INTERVAL_MINUTES}
+export function getCompletedFeedingTimes(activities:Activity[],babyId:string,now:Date){return activities.flatMap(activity=>{if(activity.babyId!==babyId)return[];const value=activity.type==="bottle"?activity.startedAt:activity.type==="breastfeeding"?activity.endedAt:undefined;if(!value)return[];const date=new Date(value);return Number.isNaN(date.getTime())||date>now?[]:[date]}).sort((a,b)=>a.getTime()-b.getTime())}
+export function getDiaperTimes(activities:Activity[],babyId:string,now:Date){return activities.flatMap(activity=>{if(activity.babyId!==babyId||activity.type!=="diaper")return[];const date=new Date(activity.startedAt);return Number.isNaN(date.getTime())||date>now?[]:[date]}).sort((a,b)=>a.getTime()-b.getTime())}
+export function calculateAdaptiveIntervalMinutes(times:Date[]){const intervals=times.slice(1).map((time,index)=>(time.getTime()-times[index].getTime())/60_000).filter(value=>value>=15&&value<=12*60).slice(-10);if(intervals.length<3)return null;const filtered=filterOutliers(intervals);if(filtered.length<3)return null;const value=weightedAverage(filtered,filtered.map((_,index)=>index+1));return {intervalMinutes:Math.round(Math.min(8*60,Math.max(30,value))),sampleSize:filtered.length}}

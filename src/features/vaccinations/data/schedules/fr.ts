@@ -1,0 +1,2 @@
+import{dose,schedule,series}from"./helpers";
+export const frSchedule=schedule("FR","FR-2026.1","FR-MOH-2026",[...series("HEXA",[{months:2},{months:4},{months:11}]),...series("PCV",[{months:2},{months:4},{months:11}]),...series("MENB",[{months:3},{months:5},{months:12}]),...series("MENACWY",[{months:6},{months:12}]),...series("MMR",[{months:12},{months:16}]),dose("DTaPIPV",4,{years:6}),...series("HPV",[{years:11},{years:11}])]);

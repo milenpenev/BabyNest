@@ -1,122 +1,93 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useLayoutEffect } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 
-function App() {
-  const [count, setCount] = useState(0)
+import AppLayout from "./layouts/AppLayout";
+import DashboardPage from "./pages/Dashboard/DashboardPage";
+import StatisticsPage from "./features/statistics/pages/StatisticsPage";
+import PlansPage from "./pages/plans/PlansPage";
+import GrowthPage from "./pages/Growth/GrowthPage";
+import BabyProfilePage from "./pages/BabyProfile/BabyProfilePage";
+import SettingsPage from "./pages/Settings/SettingsPage";
+import SleepPage from "./features/sleep/pages/SleepPage";
+import FeedingPage from "./features/feeding/pages/FeedingPage";
+import HealthPage from "./features/health/pages/HealthPage";
+import RemindersPage from "./features/reminders/pages/RemindersPage";
+import DoctorReportPage from "./features/doctor-report/pages/DoctorReportPage";
+import VaccinationSync from "./features/vaccinations/components/VaccinationSync";
+import VaccinationsPage from "./features/vaccinations/pages/VaccinationsPage";
+import VaccinationCountryContext from "./features/vaccinations/components/VaccinationCountryContext";
+import MilestonesPage from "./features/milestones/pages/MilestonesPage";
+import FamilyPage from "./features/family/pages/FamilyPage";
+import MemoriesPage from "./features/memories/pages/MemoriesPage";
+import BabyBookPage from "./features/memories/pages/BabyBookPage";
+import { useAppSettingsStore } from "./store/appSettingsStore";
+import i18n from "./i18n";
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+export default function App() {
+  const appearance = useAppSettingsStore((state) => state.appearance);
+  const language = useAppSettingsStore((state) => state.language);
 
-      <div className="ticks"></div>
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateTheme = () => {
+      const isDark = appearance === "dark" || (appearance === "system" && mediaQuery.matches);
+      root.classList.toggle("dark", isDark);
+    };
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+    updateTheme();
+    mediaQuery.addEventListener("change", updateTheme);
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+    return () => mediaQuery.removeEventListener("change", updateTheme);
+  }, [appearance]);
+
+  useEffect(() => {
+    if (i18n.resolvedLanguage !== language) void i18n.changeLanguage(language);
+  }, [language]);
+
+  return (<><VaccinationSync />
+    <Routes>
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<DashboardPage />} />
+
+        <Route
+          path="/statistics"
+          element={<StatisticsPage />}
+        />
+
+        <Route
+          path="/sleep"
+          element={<SleepPage />}
+        />
+
+        <Route
+          path="/feeding"
+          element={<FeedingPage />}
+        />
+
+        <Route path="/growth" element={<GrowthPage />} />
+
+        <Route
+          path="/health"
+          element={<HealthPage />}
+        />
+
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/reminders" element={<RemindersPage />} />
+        <Route path="/doctor-report" element={<DoctorReportPage />} />
+        <Route path="/vaccinations" element={<><VaccinationCountryContext/><VaccinationsPage /></>} />
+        <Route path="/milestones" element={<MilestonesPage />} />
+        <Route path="/family" element={<FamilyPage />} />
+        <Route path="/memories" element={<MemoriesPage />} />
+        <Route path="/memories/book" element={<BabyBookPage />} />
+        <Route path="/baby-profile" element={<BabyProfilePage />} />
+        <Route
+          path="/plans"
+          element={<PlansPage />}
+        />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes></>
+  );
 }
-
-export default App
