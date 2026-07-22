@@ -1,0 +1,2 @@
+import{dose,schedule,series}from"./helpers";
+export const gbSchedule=schedule("GB","GB-UKHSA-2026.1","GB-UKHSA-2026",[...series("HEXA",[{weeks:8},{weeks:12},{weeks:16}]),...series("ROTAVIRUS",[{weeks:8},{weeks:12}]),...series("MENB",[{weeks:8},{weeks:16},{months:12}]),...series("PCV",[{weeks:16},{months:12}]),...series("MMRV",[{months:12},{months:18}]),dose("DTaPIPV",4,{years:3}),dose("HPV",1,{years:12}),dose("MENACWY",1,{years:14})]);

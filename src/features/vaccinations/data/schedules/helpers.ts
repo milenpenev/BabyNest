@@ -1,0 +1,8 @@
+import type { SupportedVaccinationCountryCode } from "../../../../entities/baby/model/baby.types";
+import type { VaccinationAgeOffset,VaccinationCategory,VaccinationScheduleDefinition,VaccinationScheduleItemDefinition } from "../../model/vaccination.types";
+import { vaccineCatalog,type VaccineCode } from "../vaccineCatalog";
+
+const ageKey=(offset:VaccinationAgeOffset)=>offset.days===0?"vaccinations.ages.birth":offset.weeks?`vaccinations.ages.week_${offset.weeks}`:offset.months?`vaccinations.ages.month_${offset.months}`:`vaccinations.ages.year_${offset.years??0}`;
+export function dose(vaccineCode:VaccineCode,doseNumber:number,recommendedAge:VaccinationAgeOffset,category:VaccinationCategory="routine",extra:Partial<VaccinationScheduleItemDefinition>={}):VaccinationScheduleItemDefinition{const vaccine=vaccineCatalog[vaccineCode];return{scheduleItemId:`${vaccineCode}-${doseNumber}-${Object.entries(recommendedAge).map(([k,v])=>`${k}${v}`).join("-")}`,vaccineCode,diseaseCodes:[...vaccine.diseaseCodes],doseNumber,recommendedAge,category,nameKey:vaccine.nameKey,recommendedAgeKey:ageKey(recommendedAge),...extra}}
+export function schedule(countryCode:SupportedVaccinationCountryCode,scheduleVersion:string,sourceId:string,items:VaccinationScheduleItemDefinition[],regionModel:VaccinationScheduleDefinition["regionModel"]="national",regionCode?:string):VaccinationScheduleDefinition{return{countryCode,scheduleVersion,sourceId,regionModel,regionCode,items:items.map(item=>({...item,scheduleItemId:`${countryCode}${regionCode?`-${regionCode}`:""}-${item.scheduleItemId}`}))}}
+export const series=(code:VaccineCode,ages:VaccinationAgeOffset[],category:VaccinationCategory="routine")=>ages.map((age,index)=>dose(code,index+1,age,category));

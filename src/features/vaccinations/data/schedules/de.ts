@@ -1,0 +1,2 @@
+import{dose,schedule,series}from"./helpers";
+export const deSchedule=schedule("DE","DE-STIKO-2026.1","DE-RKI-STIKO-2026",[...series("ROTAVIRUS",[{weeks:6},{months:3}]),...series("HEXA",[{months:2},{months:4},{months:11}]),...series("PCV",[{months:2},{months:4},{months:11}]),...series("MENB",[{months:2},{months:4},{months:12}]),...series("MMRV",[{months:11},{months:15}]),dose("DTaPIPV",4,{years:5}),dose("DTaPIPV",5,{years:9}),...series("HPV",[{years:9},{years:9}])]);

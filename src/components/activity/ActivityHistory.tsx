@@ -1,146 +1,176 @@
-import { BedDouble, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
+import { BookHeart, Footprints, Heart } from "lucide-react";
 
+import type { Activity, SleepActivity } from "../../entities/activity/model/activity.types";
 import { useActivityStore } from "../../store/activityStore";
-
-function formatTime(dateString: string) {
-  return new Intl.DateTimeFormat("bg-BG", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(dateString));
-}
-
-function formatDuration(
-  startedAt: string,
-  endedAt: string | undefined,
-  language: string,
-  activeLabel: string,
-) {
-  if (!endedAt) return activeLabel;
-
-  const milliseconds =
-    new Date(endedAt).getTime() - new Date(startedAt).getTime();
-
-  const totalMinutes = Math.max(0, Math.floor(milliseconds / 60_000));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  if (language === "bg") {
-    return hours > 0 ? `${hours}ч ${minutes}м` : `${minutes}м`;
-  }
-
-  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-}
-
-function isToday(dateString: string) {
-  const date = new Date(dateString);
-  const today = new Date();
-
-  return (
-    date.getDate() === today.getDate() &&
-    date.getMonth() === today.getMonth() &&
-    date.getFullYear() === today.getFullYear()
-  );
-}
+import ActivityDeleteDialog from "./ActivityDeleteDialog";
+import ActivityDetailsDrawer from "./ActivityDetailsDrawer";
+import ActivityTimeline, { type TimelineEntry } from "./ActivityTimeline";
+import { localDayKey, splitSleepActivityByLocalDay } from "../../features/sleep/utils/sleepSegments";
+import type { SleepDaySegment } from "../../features/sleep/utils/sleepSegments";
+import { useBabyStore } from "../../store/babyStore";
+import { useMilestoneStore } from "../../store/milestoneStore";
+import { milestoneCatalog } from "../../features/milestones/data/catalog";
+import { useFamilyStore } from "../../store/familyStore";
+import { useCurrentUserStore } from "../../store/currentUserStore";
+import { useMemoryStore } from "../../store/memoryStore";
+import { memoryTitle } from "../../features/memories/utils/memoryDisplay";
 
 export default function ActivityHistory() {
-  const { t, i18n } = useTranslation();
-  const activities = useActivityStore((state) => state.activities);
-  const removeActivity = useActivityStore((state) => state.removeActivity);
+  const { t } = useTranslation();
 
-  const todayActivities = activities
-    .filter((activity) => isToday(activity.startedAt))
+  const activities = useActivityStore(
+    (state) => state.activities,
+  );
+
+  const removeActivity = useActivityStore(
+    (state) => state.removeActivity,
+  );
+  const activeActivity = useActivityStore((state) => state.activeActivity);
+  const selectedBabyId = useBabyStore((state) => state.selectedBabyId);
+  const milestoneRecords = useMilestoneStore((state) => state.records);
+  const familyMembers = useFamilyStore((state) => state.members);
+  const currentUserId = useCurrentUserStore((state) => state.currentUser.id);
+  const currentMember = familyMembers.find((member) => member.userId === currentUserId);
+  const memoryRecords = useMemoryStore((state) => state.memories);
+
+  const [selectedActivity, setSelectedActivity] =
+    useState<Activity | null>(null);
+  const [selectedSleepSegment, setSelectedSleepSegment] = useState<SleepDaySegment | null>(null);
+
+  const [activityToDelete, setActivityToDelete] =
+    useState<Activity | null>(null);
+  const [selectedDayKey, setSelectedDayKey] = useState(() => localDayKey(new Date()));
+  const [visualNow, setVisualNow] = useState(() => new Date());
+  const [memberFilter, setMemberFilter] = useState("all");
+
+  useEffect(() => {
+    if (activeActivity?.type !== "sleep") return;
+    const interval = window.setInterval(() => setVisualNow(new Date()), 1000);
+    return () => window.clearInterval(interval);
+  }, [activeActivity?.id, activeActivity?.type]);
+
+  useEffect(() => {
+    const previousSecond = new Date(visualNow.getTime() - 1000);
+    const currentKey = localDayKey(visualNow);
+    if (localDayKey(previousSecond) !== currentKey && selectedDayKey === localDayKey(previousSecond)) setSelectedDayKey(currentKey);
+  }, [selectedDayKey, visualNow]);
+
+  const filteredActivities = activities.filter((activity) => memberFilter === "all" || (memberFilter === "me" ? activity.createdBy === currentMember?.id : activity.createdBy === memberFilter));
+  const timelineEntries = filteredActivities.flatMap<TimelineEntry>((activity) => {
+    if (activity.type !== "sleep") {
+      return localDayKey(new Date(activity.startedAt)) === selectedDayKey ? [{ key: activity.id, activity }] : [];
+    }
+    return splitSleepActivityByLocalDay(activity)
+      .filter((segment) => segment.dayKey === selectedDayKey)
+      .map((sleepSegment) => ({ key: sleepSegment.segmentId, activity, sleepSegment }));
+  });
+
+  if (activeActivity?.type === "sleep") {
+    const now = visualNow;
+    const currentPauseMilliseconds = activeActivity.pausedAt
+      ? Math.max(0, now.getTime() - new Date(activeActivity.pausedAt).getTime())
+      : 0;
+    const visualActivity: SleepActivity = {
+      id: activeActivity.id,
+      babyId: activeActivity.babyId,
+      type: "sleep",
+      startedAt: activeActivity.startedAt,
+      createdAt: activeActivity.startedAt,
+      updatedAt: now.toISOString(),
+      data: { pausedDurationSeconds: Math.floor((activeActivity.totalPausedMilliseconds + currentPauseMilliseconds) / 1000) },
+    };
+    timelineEntries.push(...splitSleepActivityByLocalDay(visualActivity, now)
+      .filter((segment) => segment.dayKey === selectedDayKey)
+      .map((sleepSegment) => ({ key: `active:${sleepSegment.segmentId}`, activity: visualActivity, sleepSegment, isActive: true })));
+  }
+
+  const todayActivities = timelineEntries
     .sort(
       (first, second) =>
-        new Date(second.startedAt).getTime() -
-        new Date(first.startedAt).getTime(),
+        new Date(second.sleepSegment?.segmentStartedAt ?? second.activity.startedAt).getTime() -
+        new Date(first.sleepSegment?.segmentStartedAt ?? first.activity.startedAt).getTime(),
     );
+  const dayMilestones = milestoneRecords
+    .filter((record) => record.babyId === selectedBabyId && record.status !== "not-observed" && record.status !== "not-applicable")
+    .filter((record) => localDayKey(new Date(record.observedAt ?? record.firstNoticedAt ?? record.updatedAt)) === selectedDayKey)
+    .sort((a, b) => new Date(b.observedAt ?? b.firstNoticedAt ?? b.updatedAt).getTime() - new Date(a.observedAt ?? a.firstNoticedAt ?? a.updatedAt).getTime());
+  const dayMemories = memoryRecords.filter((memory) => memory.babyId === selectedBabyId && localDayKey(new Date(memory.date)) === selectedDayKey && (memory.visibility === "family" || memory.createdBy === currentMember?.id)).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime());
 
-  function handleDelete(id: string) {
-    const confirmed = window.confirm(
-      t("activity.deleteConfirmation"),
-    );
+  function confirmDelete() {
+    if (!activityToDelete) {
+      return;
+    }
 
-    if (!confirmed) return;
+    removeActivity(activityToDelete.id);
 
-    removeActivity(id);
+    if (selectedActivity?.id === activityToDelete.id) {
+      setSelectedActivity(null);
+    }
+
+    setActivityToDelete(null);
   }
 
   return (
-    <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-indigo-600">
-            {t("activity.todayActivities")}
-          </p>
-          <h2 className="mt-1 text-2xl font-bold tracking-tight">
-            {t("activity.todayHistory")}
-          </h2>
+    <>
+      <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-indigo-600">
+              {t("activity.timeline")}
+            </p>
+
+            <h2 className="mt-1 text-2xl font-bold tracking-tight">
+              {selectedDayKey === localDayKey(new Date()) ? t("activity.todayHistory") : t("sleepSegments.historyForDay", { date: selectedDayKey })}
+            </h2>
+
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              {t("activity.timelineDescription")}
+            </p>
+          </div>
+
+          <div className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+            {todayActivities.length + dayMilestones.length + dayMemories.length}
+          </div>
         </div>
+        <div className="mt-4 flex flex-wrap justify-end gap-3"><label className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300"><span>{t("family.timeline.filter")}</span><select value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 dark:border-slate-700 dark:bg-slate-900"><option value="all">{t("family.timeline.all")}</option><option value="me">{t("family.timeline.me")}</option>{familyMembers.filter((member) => member.id !== currentMember?.id).map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label><label className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300"><span>{t("sleepSegments.calendarDay")}</span><input type="date" value={selectedDayKey} max={localDayKey(new Date())} onChange={(event) => setSelectedDayKey(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 dark:border-slate-700 dark:bg-slate-900" /></label></div>
 
-        <div className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">
-          {todayActivities.length}
-        </div>
-      </div>
+        {dayMilestones.length > 0 && <div className="mt-6 space-y-3">{dayMilestones.map((record) => { const definition = record.milestoneId ? milestoneCatalog.find((item) => item.id === record.milestoneId) : undefined; return <Link key={record.id} to="/milestones" className="flex items-center gap-3 rounded-2xl border border-violet-100 bg-violet-50 p-4 hover:bg-violet-100 dark:border-violet-900/50 dark:bg-violet-950/30 dark:hover:bg-violet-950/50"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-violet-700 dark:bg-slate-800 dark:text-violet-300"><Footprints className="h-5 w-5" /></span><span className="min-w-0"><strong className="block truncate text-slate-900 dark:text-white">{record.customTitle ?? (definition ? t(definition.titleKey) : t("milestones.customMilestone"))}</strong><small className="text-slate-500 dark:text-slate-400">{t(`milestones.statuses.${record.status}`)}</small></span></Link>; })}</div>}
 
-      {todayActivities.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center">
-          <p className="font-medium text-slate-700">
-            {t("activity.empty")}
-          </p>
-          <p className="mt-1 text-sm text-slate-500">
-            {t("activity.emptyDescription")}
-          </p>
-        </div>
-      ) : (
-        <div className="mt-6 space-y-3">
-          {todayActivities.map((activity) => (
-            <article
-              key={activity.id}
-              className="flex items-center gap-4 rounded-2xl border border-slate-200 p-4 transition hover:border-indigo-200 hover:bg-indigo-50/30"
-            >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
-                <BedDouble className="h-5 w-5" />
-              </div>
+        {dayMemories.length > 0 && <div className="mt-4 grid gap-3 sm:grid-cols-2">{dayMemories.map((memory) => <Link key={memory.id} to="/memories" className="group overflow-hidden rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-violet-50 hover:border-rose-300 dark:border-rose-900 dark:from-rose-950/40 dark:to-violet-950/40">{memory.photos[0]?<img src={memory.photos[0].localUrl} alt="" className="h-28 w-full object-cover"/>:null}<span className="flex items-center gap-3 p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-rose-600 dark:bg-slate-800"><BookHeart className="h-5 w-5"/></span><span className="min-w-0 flex-1"><strong className="block truncate text-slate-900 dark:text-white">{memoryTitle(memory,t)}</strong><small className="text-slate-500 dark:text-slate-400">{t("memories.title")}</small></span>{memory.favorite?<Heart className="h-4 w-4 fill-current text-rose-500"/>:null}</span></Link>)}</div>}
 
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <p className="font-semibold text-slate-900">{t("activity.sleep")}</p>
+        {todayActivities.length === 0 && dayMilestones.length === 0 && dayMemories.length === 0 ? (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center">
+            <p className="font-medium text-slate-700">
+              {t("activity.empty")}
+            </p>
 
-                  <span className="text-sm text-slate-500">
-                    {formatTime(activity.startedAt)}
-                    {activity.endedAt
-                      ? ` – ${formatTime(activity.endedAt)}`
-                      : ""}
-                  </span>
-                </div>
+            <p className="mt-1 text-sm text-slate-500">
+              {t("activity.emptyDescription")}
+            </p>
+          </div>
+        ) : (
+          <ActivityTimeline
+            entries={todayActivities}
+            onSelect={(activity, segment) => { setSelectedActivity(activity); setSelectedSleepSegment(segment ?? null); }}
+            onDelete={setActivityToDelete}
+          />
+        )}
+      </section>
 
-                <p className="mt-1 text-sm text-slate-500">
-                  {t("activity.duration")}:{" "}
-                  <span className="font-medium text-slate-700">
-                    {formatDuration(
-                    activity.startedAt,
-                    activity.endedAt,
-                    i18n.language,
-                    t("activity.active"),
-                  )}
-                  </span>
-                </p>
-              </div>
+      <ActivityDetailsDrawer
+        activity={selectedActivity}
+        sleepSegment={selectedSleepSegment}
+        onClose={() => { setSelectedActivity(null); setSelectedSleepSegment(null); }}
+      />
 
-              <button
-                type="button"
-                onClick={() => handleDelete(activity.id)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
-                aria-label={t("activity.delete")}
-                title={t("activity.delete")}
-              >
-                <Trash2 className="h-5 w-5" />
-              </button>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
+      <ActivityDeleteDialog
+        isOpen={activityToDelete !== null}
+        onCancel={() => setActivityToDelete(null)}
+        onConfirm={confirmDelete}
+      />
+    </>
   );
 }

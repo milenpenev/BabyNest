@@ -1,4 +1,8 @@
-import type { Activity } from "../../../entities/activity/model/activity.types";
+import type {
+  Activity,
+  SleepActivity,
+} from "../../../entities/activity/model/activity.types";
+import { localDayKey, splitSleepActivityByLocalDay } from "../../sleep/utils/sleepSegments";
 
 function isToday(dateString: string) {
   const date = new Date(dateString);
@@ -12,19 +16,16 @@ function isToday(dateString: string) {
 }
 
 export function calculateTodaySleep(activities: Activity[]) {
-  return activities
-    .filter(
-      (activity) =>
-        activity.type === "sleep" &&
-        activity.endedAt !== undefined &&
-        isToday(activity.startedAt),
-    )
-    .reduce((totalMilliseconds, activity) => {
-      const startedAt = new Date(activity.startedAt).getTime();
-      const endedAt = new Date(activity.endedAt!).getTime();
+  const todayKey = localDayKey(new Date());
+  const todaySleepActivities = activities.filter(
+    (activity): activity is SleepActivity =>
+      activity.type === "sleep" &&
+      activity.endedAt !== undefined,
+  );
 
-      return totalMilliseconds + Math.max(0, endedAt - startedAt);
-    }, 0);
+  return todaySleepActivities.reduce((total, activity) => total + splitSleepActivityByLocalDay(activity)
+    .filter((segment) => segment.dayKey === todayKey)
+    .reduce((sum, segment) => sum + segment.activeDurationSeconds * 1000, 0), 0);
 }
 
 export function countTodayActivities(
@@ -33,14 +34,50 @@ export function countTodayActivities(
 ) {
   return activities.filter(
     (activity) =>
-      types.includes(activity.type) && isToday(activity.startedAt),
+      types.includes(activity.type) &&
+      isToday(activity.startedAt),
   ).length;
 }
 
-export function formatDuration(milliseconds: number) {
-  const totalMinutes = Math.floor(milliseconds / 60_000);
+export function getLatestDiaperActivity(
+  activities: Activity[],
+) {
+  return [...activities]
+    .filter(
+      (activity) => activity.type === "diaper",
+    )
+    .sort(
+      (first, second) =>
+        new Date(second.startedAt).getTime() -
+        new Date(first.startedAt).getTime(),
+    )[0];
+}
+
+export function formatDuration(
+  milliseconds: number,
+  language: string,
+) {
+  const safeMilliseconds = Math.max(
+    0,
+    milliseconds,
+  );
+
+  const totalMinutes = Math.floor(
+    safeMilliseconds / 60_000,
+  );
+
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
-  return `${hours}ч ${String(minutes).padStart(2, "0")}м`;
+  if (language === "bg") {
+    return `${hours}ч ${String(minutes).padStart(
+      2,
+      "0",
+    )}м`;
+  }
+
+  return `${hours}h ${String(minutes).padStart(
+    2,
+    "0",
+  )}m`;
 }

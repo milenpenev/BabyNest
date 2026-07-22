@@ -3,6 +3,7 @@ export interface BabyAge {
   months: number;
   weeks: number;
   days: number;
+  totalDays: number;
 }
 
 export function calculateBabyAge(
@@ -45,7 +46,25 @@ export function calculateBabyAge(
     months: Math.max(0, months),
     weeks: Math.floor(totalDays / 7),
     days: Math.max(0, days),
+    totalDays,
   };
+}
+
+export function formatBabyAgeInWeeks(
+  age: BabyAge,
+  language: string,
+): string {
+  const remainingDays = age.totalDays % 7;
+
+  if (language === "bg") {
+    const weeksLabel = age.weeks === 1 ? "седмица" : "седмици";
+    const daysLabel = remainingDays === 1 ? "ден" : "дни";
+    return `${age.weeks} ${weeksLabel} и ${remainingDays} ${daysLabel}`;
+  }
+
+  const weeksLabel = age.weeks === 1 ? "week" : "weeks";
+  const daysLabel = remainingDays === 1 ? "day" : "days";
+  return `${age.weeks} ${weeksLabel} and ${remainingDays} ${daysLabel}`;
 }
 
 export function formatBabyAge(

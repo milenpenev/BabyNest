@@ -1,0 +1,2 @@
+import{dose,schedule,series}from"./helpers";
+export const plSchedule=schedule("PL","PL-PSO-2026.1","PL-GIS-PSO-2026",[dose("BCG",1,{days:0}),...series("HEPB",[{days:0},{months:2},{months:7}]),...series("DTaPIPVHib",[{months:2},{months:4},{months:6},{months:18}]),...series("PCV",[{months:2},{months:4},{months:13}]),...series("ROTAVIRUS",[{weeks:6},{months:3}]),...series("MMR",[{months:13},{years:6}]),dose("DTaPIPV",5,{years:6}),dose("HPV",1,{years:9}),dose("TD",6,{years:14})]);

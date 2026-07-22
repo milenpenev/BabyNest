@@ -1,0 +1,2 @@
+import{dose,schedule,series}from"./helpers";
+export const bgSchedule=schedule("BG","BG-2026.1","BG-MH-N15",[dose("HEPB",1,{days:0}),dose("BCG",1,{days:2}),...series("HEXA",[{weeks:6},{weeks:10},{weeks:14}]),...series("PCV",[{weeks:6},{weeks:14},{months:12}]),dose("MMR",1,{months:13}),dose("DTaPIPVHib",4,{months:16}),dose("DTaPIPV",5,{years:6}),dose("MMR",2,{years:12}),dose("DTaP",6,{years:12}),dose("TD",7,{years:17})]);

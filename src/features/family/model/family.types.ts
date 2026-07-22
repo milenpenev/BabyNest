@@ -1,0 +1,7 @@
+export type FamilyRole = "owner" | "parent" | "guardian" | "grandparent" | "babysitter" | "doctor" | "viewer";
+export type FamilyPermission = "canEditActivities" | "canDeleteActivities" | "canManageBaby" | "canInviteMembers" | "canExportReports" | "canManagePremium" | "canViewHealth" | "canManageVaccinations" | "canManageGrowth" | "canManageMilestones" | "canManageMemories";
+export interface MemberNotificationPreferences { feeding: boolean; medication: boolean; vaccination: boolean; sleep: boolean; }
+export interface FamilyMember { id: string; familyId: string; userId: string; displayName: string; email?: string; role: FamilyRole; avatarColor: string; notificationPreferences: MemberNotificationPreferences; joinedAt: string; }
+export interface Family { id: string; name: string; premiumOwnerMemberId: string; createdAt: string; updatedAt: string; }
+export interface FamilyInvitation { id: string; familyId: string; code: string; invitedByMemberId: string; email?: string; displayName?: string; role: FamilyRole; status: "pending" | "accepted" | "revoked"; expiresAt: string; createdAt: string; acceptedAt?: string; }
+export interface FamilyAuditEntry { id: string; familyId: string; memberId: string; action: "created" | "updated" | "deleted" | "invited" | "joined" | "preferences-updated"; entityType: "family" | "activity" | "baby" | "milestone" | "memory" | "growth" | "vaccination" | "member" | "invitation"; entityId: string; descriptionKey: string; metadata?: Record<string, string | number>; createdAt: string; }

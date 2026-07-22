@@ -1,0 +1,3 @@
+import type { MemoryMedia } from "../model/memory.types";
+export const MAX_OFFLINE_MEDIA_BYTES = 3_000_000;
+export async function fileToMemoryMedia(file: File): Promise<MemoryMedia> { if (!file.type.startsWith("image/")) throw new Error("UNSUPPORTED_MEDIA"); if (file.size > MAX_OFFLINE_MEDIA_BYTES) throw new Error("MEDIA_TOO_LARGE"); const localUrl = await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(reader.error);reader.readAsDataURL(file)}); return {id:crypto.randomUUID(),kind:"photo",localUrl,name:file.name,mimeType:file.type,createdAt:new Date().toISOString()}; }

@@ -1,102 +1,119 @@
-import { useEffect, useMemo, useState } from "react";
-import type { FinishedSleepSession } from "../model/sleep.types";
+import { useEffect, useState } from "react";
+
+import { useActivityStore } from "../../../store/activityStore";
+
+function calculateDurationSeconds(
+  startedAt: string,
+  pausedAt: string | null,
+  totalPausedMilliseconds: number,
+  now: Date,
+) {
+  const effectiveEnd = pausedAt ? new Date(pausedAt) : now;
+
+  const activeMilliseconds =
+    effectiveEnd.getTime() -
+    new Date(startedAt).getTime() -
+    totalPausedMilliseconds;
+
+  return Math.max(0, Math.floor(activeMilliseconds / 1000));
+}
+
+function calculatePausedDurationSeconds(
+  pausedAt: string | null,
+  totalPausedMilliseconds: number,
+  now: Date,
+) {
+  const currentPauseMilliseconds = pausedAt
+    ? Math.max(0, now.getTime() - new Date(pausedAt).getTime())
+    : 0;
+
+  return Math.floor(
+    (totalPausedMilliseconds + currentPauseMilliseconds) / 1000,
+  );
+}
 
 export function useSleepTimer() {
-  const [startedAt, setStartedAt] = useState<Date | null>(null);
-  const [pausedAt, setPausedAt] = useState<Date | null>(null);
-  const [totalPausedMilliseconds, setTotalPausedMilliseconds] = useState(0);
+  const activeActivity = useActivityStore(
+    (state) => state.activeActivity,
+  );
+
+  const startActivity = useActivityStore(
+    (state) => state.startActivity,
+  );
+
+  const updateActiveActivityStart = useActivityStore(
+    (state) => state.updateActiveActivityStart,
+  );
+
+  const pauseActivity = useActivityStore(
+    (state) => state.pauseActivity,
+  );
+
+  const resumeActivity = useActivityStore(
+    (state) => state.resumeActivity,
+  );
+
+  const finishActivity = useActivityStore(
+    (state) => state.finishActivity,
+  );
+
   const [now, setNow] = useState(() => new Date());
 
-  const isRunning = startedAt !== null;
-  const isPaused = pausedAt !== null;
+  const activeSleep =
+    activeActivity?.type === "sleep" ? activeActivity : null;
+
+  const isRunning = activeSleep !== null;
+  const isPaused = Boolean(activeSleep?.pausedAt);
 
   useEffect(() => {
-    if (!isRunning || isPaused) return;
+    if (!isRunning) {
+      return;
+    }
+
+    setNow(new Date());
 
     const intervalId = window.setInterval(() => {
       setNow(new Date());
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [isRunning, isPaused]);
+  }, [isRunning]);
 
-  const durationSeconds = useMemo(() => {
-    if (!startedAt) return 0;
+  const durationSeconds = activeSleep
+    ? calculateDurationSeconds(
+        activeSleep.startedAt,
+        activeSleep.pausedAt,
+        activeSleep.totalPausedMilliseconds,
+        now,
+      )
+    : 0;
 
-    const effectiveEnd = pausedAt ?? now;
+  const pausedDurationSeconds = activeSleep
+    ? calculatePausedDurationSeconds(
+        activeSleep.pausedAt,
+        activeSleep.totalPausedMilliseconds,
+        now,
+      )
+    : 0;
 
-    const activeMilliseconds =
-      effectiveEnd.getTime() -
-      startedAt.getTime() -
-      totalPausedMilliseconds;
-
-    return Math.max(0, Math.floor(activeMilliseconds / 1000));
-  }, [startedAt, pausedAt, now, totalPausedMilliseconds]);
-
-  function startSleep() {
-    const currentTime = new Date();
-
-    setStartedAt(currentTime);
-    setPausedAt(null);
-    setTotalPausedMilliseconds(0);
-    setNow(currentTime);
-  }
-
-  function pauseSleep() {
-    if (!startedAt || pausedAt) return;
-
-    setPausedAt(new Date());
-  }
-
-  function resumeSleep() {
-    if (!startedAt || !pausedAt) return;
-
-    const resumedAt = new Date();
-    const pausedDuration = resumedAt.getTime() - pausedAt.getTime();
-
-    setTotalPausedMilliseconds(
-      (currentTotal) => currentTotal + pausedDuration,
-    );
-
-    setPausedAt(null);
-    setNow(resumedAt);
-  }
-
-  function stopSleep(): FinishedSleepSession | null {
-    if (!startedAt) return null;
-
-    const endedAt = pausedAt ?? new Date();
-
-    const activeMilliseconds =
-      endedAt.getTime() -
-      startedAt.getTime() -
-      totalPausedMilliseconds;
-
-    const session: FinishedSleepSession = {
+  function startSleep(babyId: string, startedAt?: string) {
+    return startActivity({
+      babyId,
+      type: "sleep",
       startedAt,
-      endedAt,
-      durationSeconds: Math.max(
-        0,
-        Math.floor(activeMilliseconds / 1000),
-      ),
-    };
-
-    setStartedAt(null);
-    setPausedAt(null);
-    setTotalPausedMilliseconds(0);
-    setNow(new Date());
-
-    return session;
+    });
   }
 
   return {
     isRunning,
     isPaused,
     durationSeconds,
-    startedAt,
+    pausedDurationSeconds,
+    startedAt: activeSleep?.startedAt ?? null,
     startSleep,
-    pauseSleep,
-    resumeSleep,
-    stopSleep,
+    updateStartTime: updateActiveActivityStart,
+    pauseSleep: pauseActivity,
+    resumeSleep: resumeActivity,
+    stopSleep: finishActivity,
   };
 }

@@ -1,0 +1,2 @@
+import{dose,schedule,series}from"./helpers";
+export const chSchedule=schedule("CH","CH-BAG-2026.1","CH-BAG-2026",[...series("HEXA",[{months:2},{months:4},{months:12}]),...series("PCV",[{months:2},{months:4},{months:12}]),...series("ROTAVIRUS",[{months:2},{months:4}],"optional"),...series("MENB",[{months:2},{months:4},{months:12}],"optional"),dose("MENACWY",1,{months:12},"optional"),...series("MMRV",[{months:9},{months:12}]),dose("DTaPIPV",4,{years:4}),...series("HPV",[{years:11},{years:11}])]);

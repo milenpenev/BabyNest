@@ -1,0 +1,4 @@
+export const diseaseCatalog = {
+  pertussis: "vaccinations.diseases.pertussis", diphtheria: "vaccinations.diseases.diphtheria", tetanus: "vaccinations.diseases.tetanus", polio: "vaccinations.diseases.polio", hib: "vaccinations.diseases.hib", hepatitisB: "vaccinations.diseases.hepatitisB", hepatitisA: "vaccinations.diseases.hepatitisA", pneumococcal: "vaccinations.diseases.pneumococcal", rotavirus: "vaccinations.diseases.rotavirus", measles: "vaccinations.diseases.measles", mumps: "vaccinations.diseases.mumps", rubella: "vaccinations.diseases.rubella", varicella: "vaccinations.diseases.varicella", meningococcalB: "vaccinations.diseases.meningococcalB", meningococcalACWY: "vaccinations.diseases.meningococcalACWY", tuberculosis: "vaccinations.diseases.tuberculosis", hpv: "vaccinations.diseases.hpv", influenza: "vaccinations.diseases.influenza",
+} as const;
+export type DiseaseCode=keyof typeof diseaseCatalog;
