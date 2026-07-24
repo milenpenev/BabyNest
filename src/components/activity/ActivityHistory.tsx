@@ -18,7 +18,17 @@ import { useCurrentUserStore } from "../../store/currentUserStore";
 import { useMemoryStore } from "../../store/memoryStore";
 import { memoryTitle } from "../../features/memories/utils/memoryDisplay";
 
-export default function ActivityHistory() {
+interface ActivityHistoryProps {
+  compact?: boolean;
+  maxEntries?: number;
+  showViewAll?: boolean;
+}
+
+export default function ActivityHistory({
+  compact = false,
+  maxEntries,
+  showViewAll = false,
+}: ActivityHistoryProps = {}) {
   const { t } = useTranslation();
 
   const activities = useActivityStore(
@@ -93,6 +103,11 @@ export default function ActivityHistory() {
         new Date(second.sleepSegment?.segmentStartedAt ?? second.activity.startedAt).getTime() -
         new Date(first.sleepSegment?.segmentStartedAt ?? first.activity.startedAt).getTime(),
     );
+
+  const visibleActivities =
+    maxEntries === undefined
+      ? todayActivities
+      : todayActivities.slice(0, maxEntries);
   const dayMilestones = milestoneRecords
     .filter((record) => record.babyId === selectedBabyId && record.status !== "not-observed" && record.status !== "not-applicable")
     .filter((record) => localDayKey(new Date(record.observedAt ?? record.firstNoticedAt ?? record.updatedAt)) === selectedDayKey)
@@ -115,33 +130,59 @@ export default function ActivityHistory() {
 
   return (
     <>
-      <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
-        <div className="flex items-end justify-between gap-4">
+      <section
+        className={[
+          "border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800",
+          compact
+            ? "mt-0 rounded-2xl p-4"
+            : "mt-8 rounded-3xl p-5 sm:p-6",
+        ].join(" ")}
+      >
+        <div
+          className={[
+            "flex justify-between gap-4",
+            compact ? "items-center" : "items-end",
+          ].join(" ")}
+        >
           <div>
-            <p className="text-sm font-medium text-indigo-600">
-              {t("activity.timeline")}
-            </p>
+            {!compact ? (
+              <p className="text-sm font-medium text-indigo-600">
+                {t("activity.timeline")}
+              </p>
+            ) : null}
 
-            <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            <h2
+              className={[
+                "font-bold tracking-tight",
+                compact ? "text-lg" : "mt-1 text-2xl",
+              ].join(" ")}
+            >
               {selectedDayKey === localDayKey(new Date()) ? t("activity.todayHistory") : t("sleepSegments.historyForDay", { date: selectedDayKey })}
             </h2>
 
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              {t("activity.timelineDescription")}
-            </p>
+            {!compact ? (
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                {t("activity.timelineDescription")}
+              </p>
+            ) : null}
           </div>
 
           <div className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
             {todayActivities.length + dayMilestones.length + dayMemories.length}
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap justify-end gap-3"><label className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300"><span>{t("family.timeline.filter")}</span><select value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 dark:border-slate-700 dark:bg-slate-900"><option value="all">{t("family.timeline.all")}</option><option value="me">{t("family.timeline.me")}</option>{familyMembers.filter((member) => member.id !== currentMember?.id).map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label><label className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300"><span>{t("sleepSegments.calendarDay")}</span><input type="date" value={selectedDayKey} max={localDayKey(new Date())} onChange={(event) => setSelectedDayKey(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 dark:border-slate-700 dark:bg-slate-900" /></label></div>
+        <div
+          className={[
+            "mt-4 flex flex-wrap justify-end gap-3",
+            compact ? "hidden" : "",
+          ].join(" ")}
+        ><label className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300"><span>{t("family.timeline.filter")}</span><select value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 dark:border-slate-700 dark:bg-slate-900"><option value="all">{t("family.timeline.all")}</option><option value="me">{t("family.timeline.me")}</option>{familyMembers.filter((member) => member.id !== currentMember?.id).map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label><label className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300"><span>{t("sleepSegments.calendarDay")}</span><input type="date" value={selectedDayKey} max={localDayKey(new Date())} onChange={(event) => setSelectedDayKey(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 dark:border-slate-700 dark:bg-slate-900" /></label></div>
 
         {dayMilestones.length > 0 && <div className="mt-6 space-y-3">{dayMilestones.map((record) => { const definition = record.milestoneId ? milestoneCatalog.find((item) => item.id === record.milestoneId) : undefined; return <Link key={record.id} to="/milestones" className="flex items-center gap-3 rounded-2xl border border-violet-100 bg-violet-50 p-4 hover:bg-violet-100 dark:border-violet-900/50 dark:bg-violet-950/30 dark:hover:bg-violet-950/50"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-violet-700 dark:bg-slate-800 dark:text-violet-300"><Footprints className="h-5 w-5" /></span><span className="min-w-0"><strong className="block truncate text-slate-900 dark:text-white">{record.customTitle ?? (definition ? t(definition.titleKey) : t("milestones.customMilestone"))}</strong><small className="text-slate-500 dark:text-slate-400">{t(`milestones.statuses.${record.status}`)}</small></span></Link>; })}</div>}
 
         {dayMemories.length > 0 && <div className="mt-4 grid gap-3 sm:grid-cols-2">{dayMemories.map((memory) => <Link key={memory.id} to="/memories" className="group overflow-hidden rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-violet-50 hover:border-rose-300 dark:border-rose-900 dark:from-rose-950/40 dark:to-violet-950/40">{memory.photos[0]?<img src={memory.photos[0].localUrl} alt="" className="h-28 w-full object-cover"/>:null}<span className="flex items-center gap-3 p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-rose-600 dark:bg-slate-800"><BookHeart className="h-5 w-5"/></span><span className="min-w-0 flex-1"><strong className="block truncate text-slate-900 dark:text-white">{memoryTitle(memory,t)}</strong><small className="text-slate-500 dark:text-slate-400">{t("memories.title")}</small></span>{memory.favorite?<Heart className="h-4 w-4 fill-current text-rose-500"/>:null}</span></Link>)}</div>}
 
-        {todayActivities.length === 0 && dayMilestones.length === 0 && dayMemories.length === 0 ? (
+        {visibleActivities.length === 0 && dayMilestones.length === 0 && dayMemories.length === 0 ? (
           <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center">
             <p className="font-medium text-slate-700">
               {t("activity.empty")}
@@ -152,11 +193,25 @@ export default function ActivityHistory() {
             </p>
           </div>
         ) : (
+          <>
           <ActivityTimeline
-            entries={todayActivities}
+            entries={visibleActivities}
+            compact={compact}
             onSelect={(activity, segment) => { setSelectedActivity(activity); setSelectedSleepSegment(segment ?? null); }}
             onDelete={setActivityToDelete}
           />
+
+        {showViewAll &&
+        todayActivities.length >
+          (maxEntries ?? todayActivities.length) ? (
+          <Link
+            to="/timeline"
+            className="mt-3 flex min-h-11 items-center justify-center rounded-xl bg-indigo-50 px-4 text-sm font-bold text-indigo-700 transition active:scale-[0.99] dark:bg-indigo-950 dark:text-indigo-300"
+          >
+            {t("mobileTimeline.viewAll")}
+          </Link>
+        ) : null}
+          </>
         )}
       </section>
 

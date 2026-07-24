@@ -15,8 +15,10 @@ import UpcomingReminderCard from "../../features/reminders/components/UpcomingRe
 import SleepCard from "../../features/sleep/components/SleepCard";
 
 import { useSubscriptionStore } from "../../store/subscriptionStore";
+import { isMobileExperience } from "../../platform/mobileExperience";
+import MobileDashboardPage from "./MobileDashboardPage";
 
-export default function DashboardPage() {
+function DesktopDashboardPage() {
   const { t } = useTranslation();
 
   const plan = useSubscriptionStore((state) => state.plan);
@@ -94,4 +96,10 @@ export default function DashboardPage() {
       </div>
     </main>
   );
+}
+
+export default function DashboardPage() {
+  return isMobileExperience()
+    ? <MobileDashboardPage />
+    : <DesktopDashboardPage />;
 }

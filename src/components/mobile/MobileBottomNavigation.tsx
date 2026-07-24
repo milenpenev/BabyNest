@@ -1,5 +1,5 @@
 import { ChartNoAxesCombined, Clock3, Home, Menu, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -13,6 +13,26 @@ export default function MobileBottomNavigation({ keyboardOpen }: { keyboardOpen:
   const navigate = useNavigate();
   const [quickAdd, setQuickAdd] = useState(false);
   const [more, setMore] = useState(false);
+
+  useEffect(() => {
+    function handleOpenQuickAdd() {
+      setMore(false);
+      setQuickAdd(true);
+    }
+
+    window.addEventListener(
+      "babynest:open-mobile-quick-add",
+      handleOpenQuickAdd,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "babynest:open-mobile-quick-add",
+        handleOpenQuickAdd,
+      );
+    };
+  }, []);
+
   if (keyboardOpen) return null;
 
   const tabs = [

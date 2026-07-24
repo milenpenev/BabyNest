@@ -5,8 +5,11 @@ import {
   Loader2,
   LogIn,
   RefreshCw,
+  RotateCcw,
   ShieldCheck,
+  Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -26,7 +29,12 @@ import {
   pushQueue,
   refreshSyncCounts,
 } from "../../../data/sync/cloudSyncService";
-import { retryFailedQueue } from "../../../data/sync/syncQueue";
+import {
+  clearFailedQueue,
+  dismissQueueOperation,
+  retryFailedQueue,
+  retryQueueOperation,
+} from "../../../data/sync/syncQueue";
 import { authService } from "../../auth/services/authService";
 import { resolveConflict } from "../services/conflictService";
 import {
@@ -54,6 +62,10 @@ export default function CloudSyncPanel() {
   const [message, setMessage] = useState("");
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [queueIssues, setQueueIssues] = useState<SyncOperation[]>([]);
+  const [queueActionId, setQueueActionId] = useState<string | null>(
+    null,
+  );
+  const [clearingQueue, setClearingQueue] = useState(false);
   const controller = useRef<AbortController | null>(null);
   async function refresh() {
     await refreshSyncCounts();
@@ -80,6 +92,78 @@ export default function CloudSyncPanel() {
       target?.focus({ preventScroll: true });
     });
   }, [conflicts.length]);
+  async function retryOperation(operationId: string) {
+    setQueueActionId(operationId);
+    setMessage("");
+
+    try {
+      await retryQueueOperation(operationId);
+      await pushQueue();
+      await refresh();
+    } catch (error) {
+      console.error(
+        "[BabyNest sync] Failed to retry operation",
+        error,
+      );
+
+      setMessage(t("cloudSync.queueActionFailed"));
+    } finally {
+      setQueueActionId(null);
+    }
+  }
+
+  async function dismissOperation(operationId: string) {
+    setQueueActionId(operationId);
+    setMessage("");
+
+    try {
+      await dismissQueueOperation(operationId);
+      await refresh();
+    } catch (error) {
+      console.error(
+        "[BabyNest sync] Failed to dismiss operation",
+        error,
+      );
+
+      setMessage(t("cloudSync.queueActionFailed"));
+    } finally {
+      setQueueActionId(null);
+    }
+  }
+
+  async function clearFailedOperations() {
+    if (
+      !window.confirm(
+        t("cloudSync.clearFailedConfirm"),
+      )
+    ) {
+      return;
+    }
+
+    setClearingQueue(true);
+    setMessage("");
+
+    try {
+      const cleared = await clearFailedQueue();
+      await refresh();
+
+      setMessage(
+        t("cloudSync.clearedFailedResult", {
+          count: cleared,
+        }),
+      );
+    } catch (error) {
+      console.error(
+        "[BabyNest sync] Failed to clear failed operations",
+        error,
+      );
+
+      setMessage(t("cloudSync.queueActionFailed"));
+    } finally {
+      setClearingQueue(false);
+    }
+  }
+
   async function startMigration() {
     if (!user || !confirm || activeSleep || activeFeeding) return;
     setBusy(true);
@@ -155,17 +239,135 @@ export default function CloudSyncPanel() {
           : "—"}
       </p>
       {queueIssues.length ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {queueIssues.map((operation) => (
-            <code
-              key={operation.id}
-              className="rounded-lg bg-rose-50 px-2 py-1 text-xs text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+        <section className="mt-5 rounded-2xl border border-rose-200 bg-rose-50/50 p-4 dark:border-rose-900 dark:bg-rose-950/20">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-rose-600" />
+
+                <h3 className="font-bold text-rose-800 dark:text-rose-200">
+                  {t("cloudSync.failedOperationsTitle")}
+                </h3>
+              </div>
+
+              <p className="mt-1 text-sm text-rose-700/80 dark:text-rose-300/80">
+                {t("cloudSync.failedOperationsHelp")}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              disabled={clearingQueue || Boolean(queueActionId)}
+              onClick={() => void clearFailedOperations()}
+              className="inline-flex items-center gap-2 rounded-xl border border-rose-300 bg-white px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-40 dark:border-rose-800 dark:bg-slate-900 dark:text-rose-300"
             >
-              {operation.entityType}:{operation.operation} ·{" "}
-              {operation.errorCode ?? "unknown"}
-            </code>
-          ))}
-        </div>
+              {clearingQueue ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+
+              {t("cloudSync.clearFailed")}
+            </button>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {queueIssues.map((operation) => {
+              const operationBusy =
+                queueActionId === operation.id;
+
+              return (
+                <article
+                  key={operation.id}
+                  className="rounded-xl border border-rose-200 bg-white p-4 dark:border-rose-900 dark:bg-slate-900"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold">
+                        {t("cloudSync.operationDescription", {
+                          entity: operation.entityType,
+                          operation: operation.operation,
+                        })}
+                      </p>
+
+                      <span className="mt-1 inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                        {t(
+                          `cloudSync.queueStatuses.${operation.status}`,
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={
+                          operationBusy ||
+                          clearingQueue
+                        }
+                        onClick={() =>
+                          void retryOperation(operation.id)
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+                      >
+                        {operationBusy ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        )}
+
+                        {t("cloudSync.retryOne")}
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={
+                          operationBusy ||
+                          clearingQueue
+                        }
+                        onClick={() =>
+                          void dismissOperation(operation.id)
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 disabled:opacity-40 dark:border-rose-900 dark:text-rose-300"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        {t("cloudSync.dismiss")}
+                      </button>
+                    </div>
+                  </div>
+
+                  <dl className="mt-3 grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+                    <dt className="text-slate-500">
+                      {t("cloudSync.errorLabel")}
+                    </dt>
+                    <dd className="break-words font-medium text-rose-700 dark:text-rose-300">
+                      {operation.errorCode ||
+                        t("cloudSync.unknownError")}
+                    </dd>
+
+                    <dt className="text-slate-500">
+                      {t("cloudSync.attemptsLabel")}
+                    </dt>
+                    <dd>{operation.attempts}</dd>
+
+                    <dt className="text-slate-500">
+                      {t("cloudSync.createdLabel")}
+                    </dt>
+                    <dd>
+                      {new Date(
+                        operation.createdAt,
+                      ).toLocaleString(i18n.language)}
+                    </dd>
+                  </dl>
+
+                  <p className="mt-3 break-all text-[11px] text-slate-400">
+                    {t("cloudSync.recordReference")}:{" "}
+                    {operation.entityId}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
       ) : null}
       {!isCloudConfigured ? (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">

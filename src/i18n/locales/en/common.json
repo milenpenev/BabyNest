@@ -275,7 +275,8 @@
     "hairWash": "Hair wash",
     "bathTime": "Bath date and time",
     "invalidBathTime": "Select a valid date and time.",
-    "bathAdded": "Bath added."
+    "bathAdded": "Bath added.",
+    "memory": "Memory"
   },
   "navigation": {
     "reminders": "Reminders",
@@ -1013,6 +1014,23 @@
       "counts": "Detected {{babies}} babies and {{activities}} activities.",
       "confirm": "I confirm that I want to upload the displayed local records. This never happens automatically.",
       "activeTimer": "Finish or cancel active sleep/breastfeeding timers before migration."
+    },
+    "failedOperationsTitle": "Failed sync operations",
+    "failedOperationsHelp": "Retry temporary failures or dismiss operations that should no longer be uploaded.",
+    "clearFailed": "Clear failed",
+    "clearFailedConfirm": "Dismiss all failed sync operations? Local records are not deleted, but these queued uploads will no longer be retried.",
+    "clearedFailedResult": "Cleared {{count}} failed sync operation(s).",
+    "retryOne": "Retry",
+    "dismiss": "Dismiss",
+    "errorLabel": "Error",
+    "attemptsLabel": "Attempts",
+    "createdLabel": "Queued",
+    "unknownError": "Unknown synchronization error",
+    "queueActionFailed": "The sync queue could not be updated. Please try again.",
+    "operationDescription": "{{entity}}:{{operation}}",
+    "queueStatuses": {
+      "failed": "Failed",
+      "blocked": "Blocked after repeated failures"
     }
   },
   "memories": {
@@ -1507,5 +1525,15 @@
     "editProfile": "Edit profile",
     "closeProfileEditor": "Close profile editor",
     "account": "User profile"
+  },
+  "mobileActiveTimer": {
+    "sleeping": "Sleep timer",
+    "breastfeeding": "Breastfeeding timer",
+    "inProgress": "In progress",
+    "paused": "Paused",
+    "openTimer": "Open {{timer}}"
+  },
+  "mobileTimeline": {
+    "viewAll": "View full timeline"
   }
 }

@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import type { Family, FamilyAuditEntry, FamilyInvitation, FamilyMember, FamilyRole, MemberNotificationPreferences } from "../features/family/model/family.types";
 import { LOCAL_USER_ID } from "./currentUserStore";
 import { useCurrentUserStore } from "./currentUserStore";
+import { useAuthStore } from "./authStore";
 const familyId = "local-family"; const ownerMemberId = "local-owner-member"; const now = new Date().toISOString();
 const defaults: MemberNotificationPreferences = { feeding: true, medication: true, vaccination: true, sleep: true };
 const defaultFamily: Family = { id: familyId, name: "My family", premiumOwnerMemberId: ownerMemberId, createdAt: now, updatedAt: now };
@@ -55,4 +56,22 @@ export const useFamilyStore = create<FamilyStore>()(persist((set, get) => ({
   },
   addAudit: (entry) => set((state) => ({ audit: [{ ...entry, id: crypto.randomUUID(), familyId: state.family.id, createdAt: new Date().toISOString() }, ...state.audit].slice(0, 250) })),
 }), { name: "babynest-family", version: 1 }));
-export function getCurrentFamilyMember() { const userId = useCurrentUserStore.getState().currentUser.id; return useFamilyStore.getState().members.find((item) => item.userId === userId) ?? null; }
+export function getCurrentFamilyMember() {
+  const cloudUserId = useAuthStore.getState().user?.id;
+  const localUserId =
+    useCurrentUserStore.getState().currentUser.id;
+
+  const activeUserId = cloudUserId ?? localUserId;
+  const { family, members } = useFamilyStore.getState();
+
+  return (
+    members.find(
+      (member) =>
+        member.familyId === family.id &&
+        (
+          member.userId === activeUserId ||
+          member.id === activeUserId
+        ),
+    ) ?? null
+  );
+}

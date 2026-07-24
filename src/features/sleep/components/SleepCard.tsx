@@ -30,7 +30,7 @@ function toLocalDateTimeInput(date: Date) {
 
   return new Date(date.getTime() - timezoneOffset)
     .toISOString()
-    .slice(0, 16);
+    .slice(0, 19);
 }
 
 function fromLocalDateTimeInput(value: string) {
@@ -40,7 +40,7 @@ function fromLocalDateTimeInput(value: string) {
 }
 
 export default function SleepCard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const babies = useBabyStore((state) => state.babies);
   const selectedBabyId = useBabyStore(
@@ -72,6 +72,8 @@ export default function SleepCard() {
   );
 
   const [startTimeError, setStartTimeError] = useState("");
+  const [startTimeEdited, setStartTimeEdited] =
+    useState(false);
 
   useEffect(() => {
     if (startedAt) {
@@ -83,6 +85,7 @@ export default function SleepCard() {
     }
 
     setStartTimeError("");
+    setStartTimeEdited(false);
   }, [startedAt]);
 
   function getSelectedStartDate() {
@@ -102,7 +105,9 @@ export default function SleepCard() {
       return;
     }
 
-    const selectedDate = getSelectedStartDate();
+    const selectedDate = startTimeEdited
+      ? getSelectedStartDate()
+      : new Date();
 
     if (!selectedDate) {
       return;
@@ -113,12 +118,38 @@ export default function SleepCard() {
       selectedDate.toISOString(),
     );
 
-    if (!started) {
+    if (started === "permission-denied") {
+      setStartTimeError(
+        i18n.language.startsWith("bg")
+          ? "Нямате права да добавяте активности в това семейство."
+          : "You do not have permission to add activities in this family.",
+      );
+
+      void hapticsService.notification("error");
+      return;
+    }
+
+    if (started === "already-running") {
+      setStartTimeError(
+        i18n.language.startsWith("bg")
+          ? "Вече има стартирана активност."
+          : "Another activity is already running.",
+      );
+
+      void hapticsService.notification("error");
+      return;
+    }
+
+    if (
+      started === "invalid-time" ||
+      started === "future-time"
+    ) {
       setStartTimeError(t("sleep.invalidStartTime"));
       void hapticsService.notification("error");
-    } else {
-      void hapticsService.impact("light");
+      return;
     }
+
+    void hapticsService.impact("light");
   }
 
   function handleUpdateStartTime() {
@@ -216,11 +247,12 @@ export default function SleepCard() {
           <input
             id="sleep-start-time"
             type="datetime-local"
-            step="60"
+            step="1"
             value={startTimeValue}
             max={toLocalDateTimeInput(new Date())}
             onChange={(event) => {
               setStartTimeValue(event.target.value);
+              setStartTimeEdited(true);
               setStartTimeError("");
             }}
             className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:focus:bg-slate-950"

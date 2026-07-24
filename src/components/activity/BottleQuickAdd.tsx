@@ -30,7 +30,7 @@ function fromLocalDateTimeInput(value: string) {
 }
 
 export default function BottleQuickAdd() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const babies = useBabyStore((state) => state.babies);
 
@@ -85,7 +85,7 @@ export default function BottleQuickAdd() {
     const createdAt = new Date().toISOString();
     const activityTime = feedingAt.toISOString();
 
-    addActivity({
+    const added = addActivity({
       id: crypto.randomUUID(),
       babyId: selectedBaby.id,
       type: "bottle",
@@ -98,6 +98,18 @@ export default function BottleQuickAdd() {
         milkType,
       },
     });
+
+    if (!added) {
+      setSaved(false);
+
+      setError(
+        i18n.language.startsWith("bg")
+          ? "Нямате права да добавяте активности в това семейство."
+          : "You do not have permission to add activities in this family.",
+      );
+
+      return;
+    }
 
     setAmountValue("");
     setMilkType("breast-milk");

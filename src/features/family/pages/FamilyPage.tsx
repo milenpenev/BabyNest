@@ -57,7 +57,6 @@ export default function FamilyPage() {
   const invitations = useFamilyStore((s) => s.invitations);
   const audit = useFamilyStore((s) => s.audit);
   const rename = useFamilyStore((s) => s.renameFamily);
-  const updateRole = useFamilyStore((s) => s.updateMemberRole);
   const updatePreferences = useFamilyStore((s) => s.updatePreferences);
   const premium = useSubscriptionStore((s) => s.plan) === "premium";
 
@@ -73,6 +72,8 @@ export default function FamilyPage() {
   const canInvite = hasFamilyPermission(currentMember, "canInviteMembers");
   const [name, setName] = useState(family.name);
   const [savingFamilyName, setSavingFamilyName] = useState(false);
+  const [updatingMemberRoleId, setUpdatingMemberRoleId] =
+    useState<string | null>(null);
   useEffect(() => {
     setName(family.name);
   }, [family.id, family.name]);
@@ -143,6 +144,10 @@ export default function FamilyPage() {
         if (!activeCloudFamily) {
           setCloudInvitations([]);
           setCloudMembers([]);
+
+        useFamilyStore.setState({
+          members: [],
+        });
           return;
         }
 
@@ -165,6 +170,26 @@ export default function FamilyPage() {
         if (!cancelled) {
           setCloudInvitations(invitationItems);
           setCloudMembers(memberItems);
+
+          // BabyNest: synchronize cloud members for permissions.
+          useFamilyStore.setState({
+            members: memberItems.map((member) => ({
+              id: member.profileId,
+              familyId: member.familyId,
+              userId: member.profileId,
+              displayName: member.displayName,
+              email: member.email ?? undefined,
+              role: member.role,
+              avatarColor: "indigo",
+              notificationPreferences: {
+                feeding: true,
+                medication: true,
+                vaccination: true,
+                sleep: true,
+              },
+              joinedAt: member.createdAt ?? new Date().toISOString(),
+            })),
+          });
         }
       })
       .catch((error) => {
@@ -200,6 +225,10 @@ export default function FamilyPage() {
     });
 
     setCloudMembers([]);
+
+        useFamilyStore.setState({
+          members: [],
+        });
     setCloudInvitations([]);
     setName(nextFamily.name);
     setMessage("");
@@ -208,6 +237,18 @@ export default function FamilyPage() {
       id: nextFamily.id,
       name: nextFamily.name,
     });
+
+    const activeUserId =
+      localStorage.getItem(
+        "babynest:active-session-user-id",
+      );
+
+    if (activeUserId) {
+      localStorage.setItem(
+        `babynest:last-family:${activeUserId}`,
+        nextFamily.id,
+      );
+    }
 
     // Reset local UI immediately before cloud reload.
     useBabyStore.getState().replaceBabies([]);
@@ -231,6 +272,26 @@ export default function FamilyPage() {
     setCloudInvitations(invitationItems);
 
     setCloudMembers(memberItems);
+
+    // BabyNest: synchronize cloud members for permissions.
+    useFamilyStore.setState({
+      members: memberItems.map((member) => ({
+        id: member.profileId,
+        familyId: member.familyId,
+        userId: member.profileId,
+        displayName: member.displayName,
+        email: member.email ?? undefined,
+        role: member.role,
+        avatarColor: "indigo",
+        notificationPreferences: {
+          feeding: true,
+          medication: true,
+          vaccination: true,
+          sleep: true,
+        },
+        joinedAt: member.createdAt ?? new Date().toISOString(),
+      })),
+    });
   }
 
   async function handleCreateFamily(familyName: string) {
@@ -248,6 +309,26 @@ export default function FamilyPage() {
 setCloudFamilies(refreshedFamilies);
 
     setCloudMembers(refreshedMembers);
+
+    // BabyNest: synchronize cloud members for permissions.
+    useFamilyStore.setState({
+      members: refreshedMembers.map((member) => ({
+        id: member.profileId,
+        familyId: member.familyId,
+        userId: member.profileId,
+        displayName: member.displayName,
+        email: member.email ?? undefined,
+        role: member.role,
+        avatarColor: "indigo",
+        notificationPreferences: {
+          feeding: true,
+          medication: true,
+          vaccination: true,
+          sleep: true,
+        },
+        joinedAt: member.createdAt ?? new Date().toISOString(),
+      })),
+    });
 
     setCloudInvitations([]);
 
@@ -309,6 +390,71 @@ setCloudFamilies(refreshedFamilies);
       cancelled = true;
     };
   }, [family.id]);
+
+  const handleMemberRoleChange = async (
+    profileId: string,
+    nextRole: FamilyRole,
+  ) => {
+    if (
+      nextRole === "owner" ||
+      updatingMemberRoleId ||
+      currentMember?.role !== "owner"
+    ) {
+      return;
+    }
+
+    const existingMember = cloudMembers.find(
+      (member) => member.profileId === profileId,
+    );
+
+    if (!existingMember) {
+      console.error(
+        "[BabyNest family role] Cloud member not found",
+        {
+          requestedProfileId: profileId,
+          cloudMembers,
+        },
+      );
+
+      setMessage("Unable to identify the selected family member.");
+      return;
+    }
+
+    if (existingMember.role === nextRole) {
+      return;
+    }
+
+    setUpdatingMemberRoleId(profileId);
+    setMessage("");
+
+    try {
+      const updatedMember = await familyService.updateMemberRole({
+        familyId: family.id,
+        profileId,
+        role: nextRole,
+      });
+
+      setCloudMembers((current) =>
+        current.map((member) =>
+          member.profileId === updatedMember.profileId
+            ? updatedMember
+            : member,
+        ),
+      );
+
+      setMessage(t("family.roleUpdated"));
+    } catch (error) {
+      console.error("Failed to update family member role", error);
+
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to update family member role.",
+      );
+    } finally {
+      setUpdatingMemberRoleId(null);
+    }
+  };
 
   const handleSaveFamilyName = async () => {
     const normalizedName = name.trim();
@@ -541,17 +687,38 @@ setCloudFamilies(refreshedFamilies);
                 <select
                   aria-label={t("family.role")}
                   value={member.role}
-                  disabled={!premium || !canInvite || member.role === "owner"}
+                  disabled={
+                    currentMember?.role !== "owner" ||
+                    member.role === "owner" ||
+                    updatingMemberRoleId ===
+                      (cloudMembers.find(
+                        (cloudMember) =>
+                          cloudMember.profileId === member.id ||
+                          cloudMember.email === member.email,
+                      )?.profileId ?? member.id)
+                  }
                   onChange={(e) =>
-                    updateRole(member.id, e.target.value as FamilyRole)
+                    void handleMemberRoleChange(
+                      cloudMembers.find(
+                        (cloudMember) =>
+                          cloudMember.profileId === member.id ||
+                          cloudMember.email === member.email,
+                      )?.profileId ?? member.id,
+                      e.target.value as FamilyRole,
+                    )
                   }
                   className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-sm dark:border-slate-600 dark:bg-slate-900"
                 >
-                  {roles.map((value) => (
-                    <option key={value} value={value}>
-                      {t(`family.roles.${value}`)}
-                    </option>
-                  ))}
+                  {roles
+                    .filter(
+                      (value) =>
+                        value !== "owner" || member.role === "owner",
+                    )
+                    .map((value) => (
+                      <option key={value} value={value}>
+                        {t(`family.roles.${value}`)}
+                      </option>
+                    ))}
                 </select>
               </div>
               <div className="mt-3 flex flex-wrap gap-1.5">
@@ -841,6 +1008,26 @@ setCloudFamilies(refreshedFamilies);
       
                 setCloudInvitations(refreshedInvitations);
                 setCloudMembers(refreshedMembers);
+
+                // BabyNest: synchronize cloud members for permissions.
+                useFamilyStore.setState({
+                  members: refreshedMembers.map((member) => ({
+                    id: member.profileId,
+                    familyId: member.familyId,
+                    userId: member.profileId,
+                    displayName: member.displayName,
+                    email: member.email ?? undefined,
+                    role: member.role,
+                    avatarColor: "indigo",
+                    notificationPreferences: {
+                      feeding: true,
+                      medication: true,
+                      vaccination: true,
+                      sleep: true,
+                    },
+                    joinedAt: member.createdAt ?? new Date().toISOString(),
+                  })),
+                });
                 setCloudFamilies(refreshedFamilies);
       
                 const joinedFamily = refreshedFamilies.find(

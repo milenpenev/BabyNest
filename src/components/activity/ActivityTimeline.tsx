@@ -28,8 +28,12 @@ import { hasFamilyPermission } from "../../features/family/permissions/familyPer
 
 interface ActivityTimelineProps {
   entries: TimelineEntry[];
-  onSelect: (activity: Activity, sleepSegment?: SleepDaySegment) => void;
+  onSelect: (
+    activity: Activity,
+    sleepSegment?: SleepDaySegment,
+  ) => void;
   onDelete: (activity: Activity) => void;
+  compact?: boolean;
 }
 
 export interface TimelineEntry {
@@ -118,6 +122,7 @@ export default function ActivityTimeline({
   entries,
   onSelect,
   onDelete,
+  compact = false,
 }: ActivityTimelineProps) {
   const { t, i18n } = useTranslation();
 
@@ -129,7 +134,12 @@ export default function ActivityTimeline({
   const canDelete = hasFamilyPermission(getCurrentFamilyMember(), "canDeleteActivities");
 
   return (
-    <div className="relative mt-6 space-y-0">
+    <div
+      className={[
+        "relative space-y-0",
+        compact ? "mt-3" : "mt-6",
+      ].join(" ")}
+    >
       <div className="absolute bottom-5 left-[21px] top-5 w-px bg-slate-200 dark:bg-slate-700" />
 
       {entries.map(({ key, activity, sleepSegment, isActive: isActiveEntry }) => {
@@ -287,11 +297,18 @@ export default function ActivityTimeline({
         return (
           <article
             key={key}
-            className="group relative flex gap-4 rounded-2xl px-1 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-900/70"
+            className={[
+              "group relative flex rounded-2xl px-1 transition hover:bg-slate-50 dark:hover:bg-slate-900/70",
+              compact
+                ? "min-h-[68px] gap-2.5 py-2"
+                : "gap-4 py-3",
+            ].join(" ")}
           >
             <div
               className={[
-                "relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-4 border-white shadow-sm transition dark:border-slate-800",
+                compact
+                  ? "relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-[3px] border-white shadow-sm transition dark:border-slate-800"
+                  : "relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-4 border-white shadow-sm transition dark:border-slate-800",
                 iconClass,
               ].join(" ")}
             >
@@ -327,20 +344,42 @@ export default function ActivityTimeline({
               )}
             </div>
 
-            <div className="flex min-w-0 flex-1 items-start gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition group-hover:border-indigo-200 group-hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:group-hover:border-indigo-800">
+            <div
+              className={[
+                "flex min-w-0 flex-1 items-start gap-2 rounded-2xl border border-slate-200 bg-white shadow-sm transition group-hover:border-indigo-200 group-hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:group-hover:border-indigo-800",
+                compact ? "p-3" : "p-4",
+              ].join(" ")}
+            >
               <button
                 type="button"
                 onClick={() => { if (!isActiveEntry) onSelect(activity, sleepSegment); }}
                 className="min-w-0 flex-1 text-left"
                 aria-label={t("activity.openDetails")}
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div
+                  className={[
+                    "flex items-start justify-between",
+                    compact
+                      ? "gap-2"
+                      : "flex-wrap gap-3",
+                  ].join(" ")}
+                >
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-900 dark:text-white">
+                    <p
+                      className={[
+                        "font-semibold text-slate-900 dark:text-white",
+                        compact ? "text-sm" : "",
+                      ].join(" ")}
+                    >
                       {title}
                     </p>
 
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    <p
+                      className={[
+                        "mt-1 text-slate-500 dark:text-slate-400",
+                        compact ? "text-xs" : "text-sm",
+                      ].join(" ")}
+                    >
                       {formatTimeValue(
                         sleepSegment?.segmentStartedAt ?? activity.startedAt,
                         timeFormat,
@@ -359,7 +398,9 @@ export default function ActivityTimeline({
 
                   <div
                     className={[
-                      "max-w-full rounded-full px-3 py-1 text-sm font-semibold",
+                      compact
+                        ? "max-w-[42%] truncate rounded-lg px-2 py-1 text-xs font-semibold"
+                        : "max-w-full rounded-full px-3 py-1 text-sm font-semibold",
                       badgeClass,
                     ].join(" ")}
                   >
@@ -522,7 +563,10 @@ export default function ActivityTimeline({
               {!isActiveEntry && canDelete ? <button
                 type="button"
                 onClick={() => onDelete(activity)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                className={[
+                  "flex shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-rose-50 hover:text-rose-600",
+                  compact ? "h-9 w-9" : "h-10 w-10",
+                ].join(" ")}
                 aria-label={t("activity.deleteActivity")}
                 title={t("activity.delete")}
               >

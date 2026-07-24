@@ -46,7 +46,7 @@ function parseOptionalPositiveNumber(value: string, maximum: number) {
 }
 
 export default function GrowthQuickAdd() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const weightUnit = useAppSettingsStore((state) => state.weightUnit);
   const lengthUnit = useAppSettingsStore((state) => state.lengthUnit);
 
@@ -122,7 +122,7 @@ export default function GrowthQuickAdd() {
     const createdAt = new Date().toISOString();
     const activityTime = measuredAt.toISOString();
 
-    addActivity({
+    const added = addActivity({
       id: crypto.randomUUID(),
       babyId: selectedBaby.id,
       type: "growth",
@@ -137,6 +137,18 @@ export default function GrowthQuickAdd() {
         headCircumferenceCm,
       },
     });
+
+    if (!added) {
+      setSaved(false);
+
+      setError(
+        i18n.language.startsWith("bg")
+          ? "Нямате права да добавяте активности в това семейство."
+          : "You do not have permission to add activities in this family.",
+      );
+
+      return;
+    }
 
     setWeightValue("");
     setHeightValue("");

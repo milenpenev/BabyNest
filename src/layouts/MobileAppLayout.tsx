@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 
+import MobileActiveTimerBar from "../components/mobile/MobileActiveTimerBar";
 import MobileBottomNavigation from "../components/mobile/MobileBottomNavigation";
 import MobileHeader from "../components/mobile/MobileHeader";
 import NativeRuntime from "../platform/NativeRuntime";
@@ -21,7 +22,13 @@ export default function MobileAppLayout() {
       <div className="native-mobile-content min-w-0">
         <Outlet />
       </div>
-      <MobileBottomNavigation keyboardOpen={keyboardOpen} />
+      <MobileActiveTimerBar
+        keyboardOpen={keyboardOpen}
+      />
+
+      <MobileBottomNavigation
+        keyboardOpen={keyboardOpen}
+      />
     </div>
   );
 }

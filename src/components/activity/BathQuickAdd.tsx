@@ -48,7 +48,7 @@ function fromLocalDateTimeInput(value: string) {
 }
 
 export default function BathQuickAdd() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const babies = useBabyStore((state) => state.babies);
 
@@ -94,7 +94,7 @@ export default function BathQuickAdd() {
     const timestamp = new Date().toISOString();
     const activityTime = bathAt.toISOString();
 
-    addActivity({
+    const added = addActivity({
       id: crypto.randomUUID(),
       babyId: selectedBaby.id,
       type: "bath",
@@ -106,6 +106,18 @@ export default function BathQuickAdd() {
         bathType,
       },
     });
+
+    if (!added) {
+      setSaved(false);
+
+      setError(
+        i18n.language.startsWith("bg")
+          ? "Нямате права да добавяте активности в това семейство."
+          : "You do not have permission to add activities in this family.",
+      );
+
+      return;
+    }
 
     setBathType("full-bath");
     setBathAtValue(

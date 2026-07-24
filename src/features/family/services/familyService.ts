@@ -315,6 +315,44 @@ export const familyService = {
     }));
   },
 
+  async updateMemberRole(input: {
+    familyId: string;
+    profileId: string;
+    role: Exclude<FamilyRole, "owner">;
+  }): Promise<CloudFamilyMember> {
+    const supabase = requireSupabase();
+
+    const { data, error } = await supabase.rpc(
+      "update_family_member_role",
+      {
+        requested_family_id: input.familyId,
+        requested_profile_id: input.profileId,
+        requested_role: input.role,
+      },
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+
+    if (!row) {
+      throw new Error("Family member role was not updated.");
+    }
+
+    const members = await this.listMembers(input.familyId);
+    const updatedMember = members.find(
+      (member) => member.profileId === input.profileId,
+    );
+
+    if (!updatedMember) {
+      throw new Error("Updated family member could not be loaded.");
+    }
+
+    return updatedMember;
+  },
+
   async listMembers(familyId: string): Promise<CloudFamilyMember[]> {
     const normalizedFamilyId = familyId.trim();
 

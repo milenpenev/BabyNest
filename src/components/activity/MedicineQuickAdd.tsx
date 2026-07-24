@@ -29,7 +29,7 @@ function fromLocalDateTimeInput(value: string) {
 }
 
 export default function MedicineQuickAdd() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const babies = useBabyStore((state) => state.babies);
 
@@ -83,7 +83,7 @@ export default function MedicineQuickAdd() {
     const timestamp = new Date().toISOString();
     const activityTime = givenAt.toISOString();
 
-    addActivity({
+    const added = addActivity({
       id: crypto.randomUUID(),
       babyId: selectedBaby.id,
       type: "medicine",
@@ -96,6 +96,18 @@ export default function MedicineQuickAdd() {
         dose: trimmedDose,
       },
     });
+
+    if (!added) {
+      setSaved(false);
+
+      setError(
+        i18n.language.startsWith("bg")
+          ? "Нямате права да добавяте активности в това семейство."
+          : "You do not have permission to add activities in this family.",
+      );
+
+      return;
+    }
 
     setMedicineName("");
     setDose("");

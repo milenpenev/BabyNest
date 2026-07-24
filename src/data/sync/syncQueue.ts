@@ -74,3 +74,58 @@ export async function retryFailedQueue() {
       updatedAt: new Date().toISOString(),
     });
 }
+
+
+export async function retryQueueOperation(operationId: string) {
+  const operation = await babyNestDb.syncQueue.get(operationId);
+
+  if (!operation) {
+    return false;
+  }
+
+  await babyNestDb.syncQueue.update(operationId, {
+    status: "pending",
+    attempts: 0,
+    nextAttemptAt: undefined,
+    errorCode: undefined,
+    updatedAt: new Date().toISOString(),
+  });
+
+  return true;
+}
+
+export async function dismissQueueOperation(operationId: string) {
+  const operation = await babyNestDb.syncQueue.get(operationId);
+
+  if (!operation) {
+    return false;
+  }
+
+  if (
+    operation.status !== "failed" &&
+    operation.status !== "blocked"
+  ) {
+    return false;
+  }
+
+  await babyNestDb.syncQueue.delete(operationId);
+
+  return true;
+}
+
+export async function clearFailedQueue() {
+  const operations = await babyNestDb.syncQueue
+    .where("status")
+    .anyOf("failed", "blocked")
+    .toArray();
+
+  if (!operations.length) {
+    return 0;
+  }
+
+  await babyNestDb.syncQueue.bulkDelete(
+    operations.map((operation) => operation.id),
+  );
+
+  return operations.length;
+}

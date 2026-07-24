@@ -61,17 +61,24 @@ interface StartActivityInput {
   startedAt?: string;
 }
 
+export type StartActivityResult =
+  | "success"
+  | "permission-denied"
+  | "already-running"
+  | "invalid-time"
+  | "future-time";
+
 interface ActivityStore {
   activities: Activity[];
   activeActivity: ActiveActivity | null;
 
-  addActivity: (activity: Activity) => void;
+  addActivity: (activity: Activity) => boolean;
   updateActivity: (id: string, updates: Partial<Activity>) => boolean;
   removeActivity: (id: string) => void;
   clearActivities: () => void;
   replaceActivities: (activities: Activity[]) => void;
 
-  startActivity: (input: StartActivityInput) => boolean;
+  startActivity: (input: StartActivityInput) => StartActivityResult;
   updateActiveActivityStart: (startedAt: string) => boolean;
   pauseActivity: () => void;
   resumeActivity: () => void;
@@ -86,7 +93,10 @@ export const useActivityStore = create<ActivityStore>()(
       activeActivity: null,
 
       addActivity: (activity) => {
-        if (!canMutate(activity, "canEditActivities")) return;
+        if (!canMutate(activity, "canEditActivities")) {
+          return false;
+        }
+
         const member = getCurrentFamilyMember();
         const attributed = {
           ...activity,
@@ -95,8 +105,13 @@ export const useActivityStore = create<ActivityStore>()(
           updatedBy: member?.id,
         } as Activity;
         void localActivityRepository.create(attributed);
-        set((state) => ({ activities: [...state.activities, attributed] }));
+        set((state) => ({
+          activities: [...state.activities, attributed],
+        }));
+
         audit(attributed, "created");
+
+        return true;
       },
 
       updateActivity: (id, updates) => {
@@ -158,20 +173,27 @@ export const useActivityStore = create<ActivityStore>()(
           activeActivity: null,
         }),
       replaceActivities: (activities) =>
-        set({ activities, activeActivity: null }),
+        set({ activities }),
 
       startActivity: ({ babyId, type, startedAt }) => {
-        if (get().activeActivity || !can("canEditActivities")) {
-          return false;
+        if (get().activeActivity) {
+          return "already-running";
         }
 
-        const requestedStart = startedAt ? new Date(startedAt) : new Date();
+        if (!can("canEditActivities")) {
+          return "permission-denied";
+        }
 
-        if (
-          Number.isNaN(requestedStart.getTime()) ||
-          requestedStart.getTime() > Date.now()
-        ) {
-          return false;
+        const requestedStart = startedAt
+          ? new Date(startedAt)
+          : new Date();
+
+        if (Number.isNaN(requestedStart.getTime())) {
+          return "invalid-time";
+        }
+
+        if (requestedStart.getTime() > Date.now()) {
+          return "future-time";
         }
 
         const activeActivity = {
@@ -198,7 +220,7 @@ export const useActivityStore = create<ActivityStore>()(
           },
         } as Activity);
 
-        return true;
+        return "success";
       },
 
       updateActiveActivityStart: (startedAt) => {
@@ -382,3 +404,20 @@ export const useActivityStore = create<ActivityStore>()(
     },
   ),
 );
+
+/**
+ * BabyNest activity-store cross-tab synchronization.
+ *
+ * Zustand persist writes the timer state to localStorage, but another
+ * already-open browser tab does not update its in-memory store
+ * automatically. Rehydrate whenever the persisted activity key changes.
+ */
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key !== "babynest-activities") {
+      return;
+    }
+
+    void useActivityStore.persist.rehydrate();
+  });
+}

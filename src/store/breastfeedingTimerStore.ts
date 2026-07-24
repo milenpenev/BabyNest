@@ -4,6 +4,8 @@ import { persist } from "zustand/middleware";
 import type { BreastSide } from "../entities/activity/model/activity.types";
 import type { Activity } from "../entities/activity/model/activity.types";
 import { localActivityRepository } from "../data/local/repositories";
+import { hasFamilyPermission } from "../features/family/permissions/familyPermissions";
+import { getCurrentFamilyMember } from "./familyStore";
 
 export interface BreastfeedingSession {
   id: string;
@@ -98,7 +100,13 @@ export const useBreastfeedingTimerStore = create<BreastfeedingTimerStore>()(
       activeSession: null,
 
       startSession: (babyId, firstSide) => {
-        if (get().activeSession) {
+        if (
+          get().activeSession ||
+          !hasFamilyPermission(
+            getCurrentFamilyMember(),
+            "canEditActivities",
+          )
+        ) {
           return false;
         }
 

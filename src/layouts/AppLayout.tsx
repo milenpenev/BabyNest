@@ -1,7 +1,9 @@
-import { isNativeApp } from "../platform/platform";
+import { isMobileExperience } from "../platform/mobileExperience";
 import MobileAppLayout from "./MobileAppLayout";
 import WebAppLayout from "./WebAppLayout";
 
 export default function AppLayout() {
-  return isNativeApp ? <MobileAppLayout /> : <WebAppLayout />;
+  return isMobileExperience()
+    ? <MobileAppLayout />
+    : <WebAppLayout />;
 }

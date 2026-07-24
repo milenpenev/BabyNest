@@ -35,7 +35,7 @@ function formatDuration(totalSeconds: number) {
 }
 
 export default function BreastfeedingCard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const babies = useBabyStore((state) => state.babies);
   const selectedBabyId = useBabyStore(
@@ -75,6 +75,7 @@ export default function BreastfeedingCard() {
   );
 
   const [now, setNow] = useState(() => new Date());
+  const [permissionError, setPermissionError] = useState("");
 
   const selectedBaby =
     babies.find((baby) => baby.id === selectedBabyId) ??
@@ -154,7 +155,20 @@ export default function BreastfeedingCard() {
       return;
     }
 
-    startSession(selectedBaby.id, side);
+    const started = startSession(selectedBaby.id, side);
+
+    if (!started) {
+      setPermissionError(
+        i18n.language.startsWith("bg")
+          ? "Нямате права да добавяте активности в това семейство."
+          : "You do not have permission to add activities in this family.",
+      );
+
+      void hapticsService.notification("error");
+      return;
+    }
+
+    setPermissionError("");
     void hapticsService.impact("light");
   }
 
@@ -167,7 +181,7 @@ export default function BreastfeedingCard() {
 
     const createdAt = new Date().toISOString();
 
-    addActivity({
+    const added = addActivity({
       id: session.id,
       babyId: session.babyId,
       type: "breastfeeding",
@@ -183,6 +197,19 @@ export default function BreastfeedingCard() {
           session.rightDurationSeconds,
       },
     });
+
+    if (!added) {
+      setPermissionError(
+        i18n.language.startsWith("bg")
+          ? "Нямате права да добавяте активности в това семейство."
+          : "You do not have permission to add activities in this family.",
+      );
+
+      void hapticsService.notification("error");
+      return;
+    }
+
+    setPermissionError("");
     void hapticsService.notification("success");
   }
 
@@ -253,6 +280,12 @@ export default function BreastfeedingCard() {
           {t("activity.totalFeedingTime")}:{" "}
           {formatDuration(totalSeconds)}
         </div>
+      )}
+
+      {permissionError && (
+        <p className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+          {permissionError}
+        </p>
       )}
 
       <div className="mt-auto pt-5">

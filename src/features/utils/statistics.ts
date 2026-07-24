@@ -3,7 +3,7 @@ import type {
   GrowthActivity,
   SleepActivity,
 } from "../../entities/activity/model/activity.types";
-import { aggregateSleepByReportingNight, intervalsOverlap, localDayKey, longestContinuousNightSleepSeconds, splitSleepActivityByLocalDay } from "../sleep/utils/sleepSegments";
+import { aggregateSleepByReportingNight, buildSleepTimelineSegments, intervalsOverlap, localDayKey } from "../sleep/utils/sleepSegments";
 import { getStatisticsRange } from "../statistics/utils/statisticsPeriod";
 import { getDiaperPeriodStats } from "../statistics/utils/diaperInsights";
 
@@ -125,22 +125,63 @@ export function buildStatisticsSnapshot(
   const { start: rangeStart, end: rangeEnd } = getStatisticsRange(period, now);
   const filteredActivities = activities.filter((activity) => {
     const activityStart = new Date(activity.startedAt);
-    const activityEnd = activity.type === "sleep" ? new Date(activity.endedAt ?? now) : new Date(activityStart.getTime() + 1);
-    return !Number.isNaN(activityStart.getTime()) && !Number.isNaN(activityEnd.getTime()) && intervalsOverlap(activityStart, activityEnd, rangeStart, rangeEnd);
+    const activityEnd =
+      activity.type === "sleep"
+        ? new Date(activity.endedAt ?? now)
+        : new Date(activityStart.getTime() + 1);
+
+    return (
+      !Number.isNaN(activityStart.getTime()) &&
+      !Number.isNaN(activityEnd.getTime()) &&
+      intervalsOverlap(
+        activityStart,
+        activityEnd,
+        rangeStart,
+        rangeEnd,
+      )
+    );
   });
+
+  const sleepActivities = filteredActivities.filter(
+    (activity): activity is SleepActivity =>
+      activity.type === "sleep",
+  );
+
+  const sleepTimelineSegments =
+    buildSleepTimelineSegments(
+      sleepActivities,
+      now,
+    ).filter((segment) =>
+      dayMap.has(segment.dayKey),
+    );
+
+  for (const segment of sleepTimelineSegments) {
+    const segmentDay = dayMap.get(
+      segment.dayKey,
+    );
+
+    if (!segmentDay) {
+      continue;
+    }
+
+    segmentDay.sleepMilliseconds +=
+      segment.activeDurationSeconds * 1000;
+
+    segmentDay.daySleepMilliseconds +=
+      segment.daySleepSeconds * 1000;
+
+    segmentDay.nightSleepMilliseconds +=
+      segment.nightSleepSeconds * 1000;
+  }
 
   filteredActivities.forEach((activity) => {
     if (activity.type === "sleep") {
-      for (const segment of splitSleepActivityByLocalDay(activity, now)) {
-        const segmentDay = dayMap.get(segment.dayKey);
-        if (!segmentDay) continue;
-        segmentDay.sleepMilliseconds += segment.activeDurationSeconds * 1000;
-        segmentDay.daySleepMilliseconds += segment.daySleepSeconds * 1000;
-        segmentDay.nightSleepMilliseconds += segment.nightSleepSeconds * 1000;
-      }
       return;
     }
-    const day = dayMap.get(getActivityDateKey(activity));
+
+    const day = dayMap.get(
+      getActivityDateKey(activity),
+    );
     if (!day) {
       return;
     }
@@ -167,22 +208,124 @@ export function buildStatisticsSnapshot(
     }
   });
 
-  const totalSleepMilliseconds = days.reduce((total, day) => total + day.sleepMilliseconds, 0);
-  const sleepActivities = filteredActivities
-    .filter((activity): activity is SleepActivity => activity.type === "sleep")
-  const rangeDayKeys = new Set(days.map((day) => day.dateKey));
-  const segmentsInRange = (activity: SleepActivity) => splitSleepActivityByLocalDay(activity).filter((segment) => rangeDayKeys.has(segment.dayKey));
-  const napDurations = sleepActivities.map((activity) => segmentsInRange(activity).reduce((sum, segment) => sum + segment.activeDurationSeconds * 1000, 0)).filter((duration) => duration > 0);
-  const napCount = napDurations.length;
-  const averageNapDurationMilliseconds = napDurations.length > 0 ? Math.round(napDurations.reduce((sum, duration) => sum + duration, 0) / napDurations.length) : 0;
-  const longestNapMilliseconds = napDurations.length > 0 ? Math.max(...napDurations) : 0;
-  const nightSleepMilliseconds = days.reduce((sum, day) => sum + day.nightSleepMilliseconds, 0);
-  const daySleepMilliseconds = days.reduce((sum, day) => sum + day.daySleepMilliseconds, 0);
-  const dayNaps = sleepActivities.map((activity) => segmentsInRange(activity).reduce((sum, segment) => sum + segment.daySleepSeconds * 1000, 0)).filter((duration) => duration > 0);
-  const firstReportingDate = new Date(rangeStart); firstReportingDate.setDate(firstReportingDate.getDate() - 1);
-  const reportingKeys = new Set([localDayKey(firstReportingDate), ...days.map((day) => day.dateKey)]);
-  const reportingNights = [...aggregateSleepByReportingNight(sleepActivities).entries()].filter(([key]) => reportingKeys.has(key)).map(([, seconds]) => seconds * 1000);
-  const nightIntervals = sleepActivities.map((activity) => longestContinuousNightSleepSeconds(activity) * 1000);
+  const totalSleepMilliseconds = days.reduce(
+    (total, day) =>
+      total + day.sleepMilliseconds,
+    0,
+  );
+
+  const intervalTotals = new Map<
+    string,
+    {
+      totalMilliseconds: number;
+      dayMilliseconds: number;
+      nightMilliseconds: number;
+    }
+  >();
+
+  for (const segment of sleepTimelineSegments) {
+    const current = intervalTotals.get(
+      segment.intervalId,
+    ) ?? {
+      totalMilliseconds: 0,
+      dayMilliseconds: 0,
+      nightMilliseconds: 0,
+    };
+
+    current.totalMilliseconds +=
+      segment.activeDurationSeconds * 1000;
+
+    current.dayMilliseconds +=
+      segment.daySleepSeconds * 1000;
+
+    current.nightMilliseconds +=
+      segment.nightSleepSeconds * 1000;
+
+    intervalTotals.set(
+      segment.intervalId,
+      current,
+    );
+  }
+
+  const sleepDurations = [
+    ...intervalTotals.values(),
+  ]
+    .map((interval) =>
+      interval.totalMilliseconds,
+    )
+    .filter((duration) => duration > 0);
+
+  const napCount = sleepDurations.length;
+
+  const averageNapDurationMilliseconds =
+    sleepDurations.length > 0
+      ? Math.round(
+          sleepDurations.reduce(
+            (sum, duration) =>
+              sum + duration,
+            0,
+          ) / sleepDurations.length,
+        )
+      : 0;
+
+  const longestNapMilliseconds =
+    sleepDurations.length > 0
+      ? Math.max(...sleepDurations)
+      : 0;
+
+  const nightSleepMilliseconds = days.reduce(
+    (sum, day) =>
+      sum + day.nightSleepMilliseconds,
+    0,
+  );
+
+  const daySleepMilliseconds = days.reduce(
+    (sum, day) =>
+      sum + day.daySleepMilliseconds,
+    0,
+  );
+
+  const dayNaps = [
+    ...intervalTotals.values(),
+  ]
+    .map((interval) =>
+      interval.dayMilliseconds,
+    )
+    .filter((duration) => duration > 0);
+
+  const firstReportingDate = new Date(
+    rangeStart,
+  );
+
+  firstReportingDate.setDate(
+    firstReportingDate.getDate() - 1,
+  );
+
+  const reportingKeys = new Set([
+    localDayKey(firstReportingDate),
+    ...days.map((day) => day.dateKey),
+  ]);
+
+  const reportingNights = [
+    ...aggregateSleepByReportingNight(
+      sleepActivities,
+      now,
+    ).entries(),
+  ]
+    .filter(([key]) =>
+      reportingKeys.has(key),
+    )
+    .map(([, seconds]) =>
+      seconds * 1000,
+    );
+
+  const nightIntervals = [
+    ...intervalTotals.values(),
+  ]
+    .map((interval) =>
+      interval.nightMilliseconds,
+    )
+    .filter((duration) => duration > 0);
 
   const totalFeedings = days.reduce((total, day) => total + day.feedingCount, 0);
   const breastfeedingCount = days.reduce((total, day) => total + day.breastfeedingCount, 0);
