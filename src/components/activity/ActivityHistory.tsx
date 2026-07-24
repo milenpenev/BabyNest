@@ -6,7 +6,7 @@ import { BookHeart, Footprints, Heart } from "lucide-react";
 import type { Activity, SleepActivity } from "../../entities/activity/model/activity.types";
 import { useActivityStore } from "../../store/activityStore";
 import ActivityDeleteDialog from "./ActivityDeleteDialog";
-import ActivityDetailsDrawer from "./ActivityDetailsDrawer";
+import ActivityDetailsPresenter from "./ActivityDetailsPresenter";
 import ActivityTimeline, { type TimelineEntry } from "./ActivityTimeline";
 import { localDayKey, splitSleepActivityByLocalDay } from "../../features/sleep/utils/sleepSegments";
 import type { SleepDaySegment } from "../../features/sleep/utils/sleepSegments";
@@ -160,7 +160,7 @@ export default function ActivityHistory() {
         )}
       </section>
 
-      <ActivityDetailsDrawer
+      <ActivityDetailsPresenter
         activity={selectedActivity}
         sleepSegment={selectedSleepSegment}
         onClose={() => { setSelectedActivity(null); setSelectedSleepSegment(null); }}

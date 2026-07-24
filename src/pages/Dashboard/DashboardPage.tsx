@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import ActivityHistory from "../../components/activity/ActivityHistory";
 import BreastfeedingCard from "../../components/activity/BreastfeedingCard";
 import QuickAddLauncher from "../../components/activity/QuickAddLauncher";
@@ -5,60 +7,90 @@ import DashboardHero from "../../components/dashboard/DashboardHero";
 import SummaryCards from "../../components/dashboard/SummaryCards";
 import PremiumGate from "../../components/premium/PremiumGate";
 import StatisticsOverview from "../../components/statistics/StatisticsOverview";
-import SleepCard from "../../features/sleep/components/SleepCard";
-import { useSubscriptionStore } from "../../store/subscriptionStore";
-import { useTranslation } from "react-i18next";
-import UpcomingReminderCard from "../../features/reminders/components/UpcomingReminderCard";
-import MilestoneDashboardCard from "../../features/milestones/components/MilestoneDashboardCard";
+
 import CoachCard from "../../features/coach/components/CoachCard";
 import MemoryDashboardCard from "../../features/memories/components/MemoryDashboardCard";
+import MilestoneDashboardCard from "../../features/milestones/components/MilestoneDashboardCard";
+import UpcomingReminderCard from "../../features/reminders/components/UpcomingReminderCard";
+import SleepCard from "../../features/sleep/components/SleepCard";
+
+import { useSubscriptionStore } from "../../store/subscriptionStore";
 
 export default function DashboardPage() {
   const { t } = useTranslation();
-  const plan = useSubscriptionStore(
-    (state) => state.plan,
-  );
 
+  const plan = useSubscriptionStore((state) => state.plan);
   const isPremium = plan === "premium";
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <DashboardHero />
+      <div className="mx-auto w-full max-w-[1440px] px-3 py-4 sm:px-5 sm:py-5 lg:px-8">
+        {/* Dashboard header */}
+        <section>
+          <DashboardHero />
+        </section>
 
-        <SummaryCards />
-        <UpcomingReminderCard />
+        {/* Daily summary */}
+        <section className="mt-3 grid items-stretch gap-3 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="min-w-0">
+            <SummaryCards />
+          </div>
 
-        <div className="mt-8 grid gap-6 xl:grid-cols-2">
-          <SleepCard />
-          <BreastfeedingCard />
-        </div>
+          <div className="min-w-0">
+            <UpcomingReminderCard />
+          </div>
+        </section>
 
-        <div className="mt-8">
+        {/* Quick actions */}
+        <section className="mt-6">
           <QuickAddLauncher />
-        </div>
+        </section>
 
-        <ActivityHistory />
-        <MemoryDashboardCard />
+        {/* Main tracking cards */}
+        <section className="mt-6 grid items-stretch gap-6 lg:grid-cols-2">
+          <div className="flex min-w-0 [&>*]:w-full [&>*]:flex-1">
+            <SleepCard />
+          </div>
+          <div className="flex min-w-0 [&>*]:w-full [&>*]:flex-1">
+            <BreastfeedingCard />
+          </div>
+        </section>
 
-        <CoachCard />
-        <MilestoneDashboardCard />
+        {/*
+          Independent dashboard columns.
 
-        {isPremium ? (
-          <StatisticsOverview />
-        ) : (
-          <div className="mt-8">
+          Each column controls its own vertical flow, which avoids the large
+          empty space caused by placing ActivityHistory and CoachCard in the
+          same grid row.
+        */}
+        <section className="mt-2 grid items-start gap-3 xl:grid-cols-[minmax(0,1.65fr)_minmax(360px,0.85fr)]">
+          {/* Left column */}
+          <div className="grid min-w-0 content-start gap-6">
+            <ActivityHistory />
+            <MilestoneDashboardCard />
+          </div>
+
+          {/* Right column */}
+          <aside className="grid min-w-0 content-start gap-6">
+            <CoachCard />
+            <MemoryDashboardCard />
+          </aside>
+        </section>
+
+        {/* Statistics */}
+        <section className="mt-8">
+          {isPremium ? (
+            <StatisticsOverview />
+          ) : (
             <PremiumGate
               preview={<StatisticsOverview />}
               title={t("premium.dashboardStatisticsTitle")}
-              description={t(
-              "premium.dashboardStatisticsDescription",
-            )}
+              description={t("premium.dashboardStatisticsDescription")}
             >
               <StatisticsOverview />
             </PremiumGate>
-          </div>
-        )}
+          )}
+        </section>
       </div>
     </main>
   );

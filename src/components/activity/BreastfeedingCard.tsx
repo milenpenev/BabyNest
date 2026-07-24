@@ -15,6 +15,7 @@ import type {
 import { useActivityStore } from "../../store/activityStore";
 import { useBabyStore } from "../../store/babyStore";
 import { useBreastfeedingTimerStore } from "../../store/breastfeedingTimerStore";
+import { hapticsService } from "../../platform/haptics/hapticsService";
 
 function formatDuration(totalSeconds: number) {
   const safeSeconds = Math.max(
@@ -154,6 +155,7 @@ export default function BreastfeedingCard() {
     }
 
     startSession(selectedBaby.id, side);
+    void hapticsService.impact("light");
   }
 
   function handleFinish() {
@@ -181,6 +183,7 @@ export default function BreastfeedingCard() {
           session.rightDurationSeconds,
       },
     });
+    void hapticsService.notification("success");
   }
 
   return (
@@ -280,13 +283,14 @@ export default function BreastfeedingCard() {
             {!activeSession.isPaused && (
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
                   switchSide(
                     activeSession.activeSide === "left"
                       ? "right"
                       : "left",
-                  )
-                }
+                  );
+                  void hapticsService.selection();
+                }}
                 className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 font-semibold text-white transition hover:bg-violet-700"
               >
                 <Repeat2 className="h-4 w-4" />
@@ -300,11 +304,11 @@ export default function BreastfeedingCard() {
             <div className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
-                onClick={
-                  activeSession.isPaused
-                    ? resumeSession
-                    : pauseSession
-                }
+                onClick={() => {
+                  if (activeSession.isPaused) resumeSession();
+                  else pauseSession();
+                  void hapticsService.impact("light");
+                }}
                 className="flex h-11 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 font-semibold text-white transition hover:bg-amber-600"
               >
                 {activeSession.isPaused ? (

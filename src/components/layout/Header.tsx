@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useBabyStore } from "../../store/babyStore";
 import LanguageSwitcher from "../common/LanguageSwitcher";
 import { useAppSettingsStore } from "../../store/appSettingsStore";
+import SyncStatusBadge from "../../features/cloud-sync/components/SyncStatusBadge";
 import NotificationCenter from "./NotificationCenter";
 
 export default function Header() {
@@ -42,7 +43,9 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-2">
+          <SyncStatusBadge />
           <LanguageSwitcher />
+          <NotificationCenter />
 
           <button
             type="button"
@@ -53,8 +56,6 @@ export default function Header() {
           >
             {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </button>
-
-          <NotificationCenter />
 
           <button
             type="button"

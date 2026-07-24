@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 
 import { useActivityStore } from "../../../store/activityStore";
 import { useBabyStore } from "../../../store/babyStore";
+import { hapticsService } from "../../../platform/haptics/hapticsService";
 import { useSleepTimer } from "../hooks/useSleepTimer";
 
 function formatDuration(seconds: number) {
@@ -114,6 +115,9 @@ export default function SleepCard() {
 
     if (!started) {
       setStartTimeError(t("sleep.invalidStartTime"));
+      void hapticsService.notification("error");
+    } else {
+      void hapticsService.impact("light");
     }
   }
 
@@ -156,6 +160,8 @@ export default function SleepCard() {
           session.pausedDurationSeconds,
       },
     });
+
+    void hapticsService.notification("success");
   }
 
   const statusText = !isRunning
@@ -165,39 +171,39 @@ export default function SleepCard() {
       : t("sleep.sleeping");
 
   return (
-    <section className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
+    <section className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
       <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
-          <BedDouble className="h-6 w-6" />
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
+          <BedDouble className="h-5 w-5" />
         </div>
 
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white sm:text-lg">
             {t("sleep.title")}
           </h2>
 
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
             {statusText}
           </p>
         </div>
       </div>
 
-      <div className="mt-8 text-center">
-        <div className="font-mono text-5xl font-bold text-slate-900 dark:text-white">
+      <div className="mt-5 text-center">
+        <div className="font-mono text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
           {formatDuration(durationSeconds)}
         </div>
 
-        <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
+        <div className="mt-2 inline-flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 sm:text-sm">
           <Pause className="h-4 w-4" />
           {t("sleep.pausedDuration")}:{" "}
           {formatDuration(pausedDurationSeconds)}
         </div>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-4">
         <label
           htmlFor="sleep-start-time"
-          className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
+          className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
         >
           <Clock3 className="h-4 w-4" />
 
@@ -217,14 +223,14 @@ export default function SleepCard() {
               setStartTimeValue(event.target.value);
               setStartTimeError("");
             }}
-            className="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:focus:bg-slate-950"
+            className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:focus:bg-slate-950"
           />
 
           {isRunning && (
             <button
               type="button"
               onClick={handleUpdateStartTime}
-              className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
+              className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
             >
               <Save className="h-4 w-4" />
               {t("sleep.saveStartTime")}
@@ -233,19 +239,19 @@ export default function SleepCard() {
         </div>
 
         {startTimeError && (
-          <p className="mt-2 text-sm font-medium text-rose-600">
+          <p className="mt-1.5 text-sm font-medium text-rose-600">
             {startTimeError}
           </p>
         )}
       </div>
 
-      <div className="mt-auto pt-8">
+      <div className="mt-4">
         {!isRunning ? (
           <button
             type="button"
             onClick={handleStartSleep}
             disabled={!selectedBaby}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-3 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-2.5 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Play className="h-5 w-5" />
             {t("sleep.start")}
@@ -254,8 +260,16 @@ export default function SleepCard() {
           <div className="grid gap-3 sm:grid-cols-2">
             <button
               type="button"
-              onClick={isPaused ? resumeSleep : pauseSleep}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 py-3 font-semibold text-white transition hover:bg-amber-600"
+              onClick={() => {
+                if (isPaused) {
+                  resumeSleep();
+                } else {
+                  pauseSleep();
+                }
+
+                void hapticsService.impact("light");
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 py-2.5 font-semibold text-white transition hover:bg-amber-600"
             >
               {isPaused ? (
                 <Play className="h-5 w-5" />
@@ -271,7 +285,7 @@ export default function SleepCard() {
             <button
               type="button"
               onClick={handleStopSleep}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 py-3 font-semibold text-white transition hover:bg-rose-700"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 py-2.5 font-semibold text-white transition hover:bg-rose-700"
             >
               <Square className="h-5 w-5" />
               {t("sleep.stop")}

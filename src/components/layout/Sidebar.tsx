@@ -1,7 +1,6 @@
 import {
   Baby,
   BarChart3,
-  BellRing,
   BedDouble,
   ChartNoAxesCombined,
   Crown,
@@ -20,9 +19,6 @@ import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 
 import { useSubscriptionStore } from "../../store/subscriptionStore";
-import { useReminderStore } from "../../store/reminderStore";
-import { useBabyStore } from "../../store/babyStore";
-import { isReminderOverdue } from "../../features/reminders/utils/reminderSchedule";
 
 const navigationItems = [
   {
@@ -61,12 +57,6 @@ const navigationItems = [
     icon: ChartNoAxesCombined,
     path: "/statistics",
     premium: true,
-  },
-  {
-    key: "reminders",
-    labelKey: "navigation.reminders",
-    icon: BellRing,
-    path: "/reminders",
   },
   {
     key: "vaccinations",
@@ -117,12 +107,7 @@ const navigationItems = [
 export default function Sidebar() {
   const { t } = useTranslation();
 
-  const plan = useSubscriptionStore(
-    (state) => state.plan,
-  );
-  const selectedBabyId = useBabyStore((state) => state.selectedBabyId);
-  const reminders = useReminderStore((state) => state.reminders);
-  const overdueCount = reminders.filter((reminder) => reminder.babyId === selectedBabyId && isReminderOverdue(reminder)).length;
+  const plan = useSubscriptionStore((state) => state.plan);
 
   return (
     <aside className="min-h-screen w-64 shrink-0 border-r border-slate-200 bg-white">
@@ -133,25 +118,15 @@ export default function Sidebar() {
           </div>
 
           <div>
-            <p className="text-lg font-bold tracking-tight">
-              BabyNest
-            </p>
+            <p className="text-lg font-bold tracking-tight">BabyNest</p>
 
-            <p className="text-xs text-slate-500">
-              Family assistant
-            </p>
+            <p className="text-xs text-slate-500">Family assistant</p>
           </div>
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-4">
           {navigationItems.map(
-            ({
-              key,
-              labelKey,
-              icon: Icon,
-              path,
-              premium,
-            }) => (
+            ({ key, labelKey, icon: Icon, path, premium }) => (
               <NavLink
                 key={key}
                 to={path}
@@ -167,11 +142,7 @@ export default function Sidebar() {
               >
                 <Icon className="h-5 w-5 shrink-0" />
 
-                <span className="min-w-0 flex-1 text-left">
-                  {t(labelKey)}
-                </span>
-
-                {key === "reminders" && overdueCount > 0 ? <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-xs font-bold text-white">{overdueCount}</span> : null}
+                <span className="min-w-0 flex-1 text-left">{t(labelKey)}</span>
 
                 {premium &&
                   (plan === "premium" ? (
@@ -182,9 +153,7 @@ export default function Sidebar() {
                   ) : (
                     <LockKeyhole
                       className="h-4 w-4 shrink-0 text-slate-400"
-                      aria-label={t(
-                        "premium.premiumFeature",
-                      )}
+                      aria-label={t("premium.premiumFeature")}
                     />
                   ))}
               </NavLink>
@@ -197,9 +166,7 @@ export default function Sidebar() {
             <div className="flex items-center gap-2">
               <Crown className="h-4 w-4 text-amber-300" />
 
-              <p className="text-sm font-semibold">
-                Premium+
-              </p>
+              <p className="text-sm font-semibold">Premium+</p>
             </div>
 
             <p className="mt-2 text-xs leading-5 text-indigo-100">

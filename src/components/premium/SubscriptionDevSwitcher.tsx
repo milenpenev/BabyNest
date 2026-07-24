@@ -3,13 +3,9 @@ import { Crown, LockKeyhole } from "lucide-react";
 import { useSubscriptionStore } from "../../store/subscriptionStore";
 
 export default function SubscriptionDevSwitcher() {
-  const plan = useSubscriptionStore(
-    (state) => state.plan,
-  );
+  const plan = useSubscriptionStore((state) => state.plan);
 
-  const setPlan = useSubscriptionStore(
-    (state) => state.setPlan,
-  );
+  const setPlan = useSubscriptionStore((state) => state.setPlan);
 
   return (
     <div className="fixed bottom-4 right-4 z-[100] flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">

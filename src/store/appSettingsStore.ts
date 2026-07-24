@@ -11,6 +11,7 @@ export type AppAppearance = "system" | "light" | "dark";
 
 export interface AppSettings {
   version: number;
+  hapticsEnabled: boolean;
   language: AppLanguage;
   timeFormat: AppTimeFormat;
   dateFormat: AppDateFormat;
@@ -29,7 +30,8 @@ export interface AppSettings {
 }
 
 export const defaultSettings: AppSettings = {
-  version: 1,
+  version: 2,
+  hapticsEnabled: false,
   language: "bg",
   timeFormat: "24h",
   dateFormat: "dd.MM.yyyy",
@@ -52,7 +54,8 @@ export function normalizeSettings(value: Partial<AppSettings> | null | undefined
     typeof candidate === "string" && options.includes(candidate as T) ? candidate as T : fallback;
   const notifications = value?.notifications;
   return {
-    version: 1,
+    version: 2,
+    hapticsEnabled: value?.hapticsEnabled === true,
     language: isOneOf(value?.language, ["bg", "en"], defaultSettings.language),
     timeFormat: isOneOf(value?.timeFormat, ["24h", "12h"], defaultSettings.timeFormat),
     dateFormat: isOneOf(value?.dateFormat, ["dd.MM.yyyy", "MM/dd/yyyy", "yyyy-MM-dd"], defaultSettings.dateFormat),
@@ -79,6 +82,7 @@ interface AppSettingsStore extends AppSettings {
   setWeightUnit: (weightUnit: AppWeightUnit) => void;
   setLengthUnit: (lengthUnit: AppLengthUnit) => void;
   setAppearance: (appearance: AppAppearance) => void;
+  setHapticsEnabled: (enabled: boolean) => void;
   setNotification: (key: keyof AppSettings["notifications"], value: boolean) => void;
   replaceSettings: (settings: AppSettings) => void;
   reset: () => void;
@@ -95,6 +99,7 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
       setWeightUnit: (weightUnit) => set({ weightUnit }),
       setLengthUnit: (lengthUnit) => set({ lengthUnit }),
       setAppearance: (appearance) => set({ appearance }),
+      setHapticsEnabled: (hapticsEnabled) => set({ hapticsEnabled }),
       setNotification: (key, value) =>
         set((state) => ({
           notifications: {
@@ -113,7 +118,7 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
     }),
     {
       name: "babynest-settings",
-      version: 1,
+      version: 2,
       migrate: (persistedState, version) => {
         if (version === 0) {
           return normalizeSettings(persistedState as Partial<AppSettings> | null | undefined);
@@ -138,6 +143,7 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
           setWeightUnit: currentState.setWeightUnit,
           setLengthUnit: currentState.setLengthUnit,
           setAppearance: currentState.setAppearance,
+          setHapticsEnabled: currentState.setHapticsEnabled,
           setNotification: currentState.setNotification,
           replaceSettings: currentState.replaceSettings,
           reset: currentState.reset,

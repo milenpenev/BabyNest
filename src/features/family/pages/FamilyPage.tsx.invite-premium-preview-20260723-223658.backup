@@ -1,0 +1,717 @@
+import {
+  Check,
+  Clipboard,
+  Clock3,
+  Crown,
+  History,
+  MailPlus,
+  ShieldCheck,
+  UserRound,
+  Users,
+  X,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { familyService } from "../services/familyService";
+import CreateFamilyCard from "../components/CreateFamilyCard";
+import { useTranslation } from "react-i18next";
+import PremiumGate from "../../../components/premium/PremiumGate";
+import { useFamilyStore } from "../../../store/familyStore";
+import { useActivityStore } from "../../../store/activityStore";
+import { useBabyStore } from "../../../store/babyStore";
+import { useAuthStore } from "../../../store/authStore";
+import { useSubscriptionStore } from "../../../store/subscriptionStore";
+import type {
+  FamilyRole,
+  MemberNotificationPreferences,
+} from "../model/family.types";
+import {
+  getFamilyPermissions,
+  hasFamilyPermission,
+} from "../permissions/familyPermissions";
+
+const roles: FamilyRole[] = [
+  "owner",
+  "parent",
+  "guardian",
+  "grandparent",
+  "babysitter",
+  "doctor",
+  "viewer",
+];
+const preferenceKeys: Array<keyof MemberNotificationPreferences> = [
+  "feeding",
+  "medication",
+  "vaccination",
+  "sleep",
+];
+const colors: Record<string, string> = {
+  indigo: "bg-indigo-600",
+  violet: "bg-violet-600",
+  emerald: "bg-emerald-600",
+  sky: "bg-sky-600",
+};
+
+export default function FamilyPage() {
+  const { t, i18n } = useTranslation();
+  const family = useFamilyStore((s) => s.family);
+  const members = useFamilyStore((s) => s.members);
+  const invitations = useFamilyStore((s) => s.invitations);
+  const audit = useFamilyStore((s) => s.audit);
+  const rename = useFamilyStore((s) => s.renameFamily);
+  const updateRole = useFamilyStore((s) => s.updateMemberRole);
+  const updatePreferences = useFamilyStore((s) => s.updatePreferences);
+  const premium = useSubscriptionStore((s) => s.plan) === "premium";
+
+  const [cloudInvitations, setCloudInvitations] = useState<any[]>([]);
+  const [cloudMembers, setCloudMembers] = useState<any[]>([]);
+  const [cloudFamilies, setCloudFamilies] = useState<any[]>([]);
+
+  const authUser = useAuthStore((state) => state.user);
+
+  const currentMember =
+    cloudMembers.find((member) => member.profileId === authUser?.id) ?? null;
+
+  const canInvite = hasFamilyPermission(currentMember, "canInviteMembers");
+  const [name, setName] = useState(family.name);
+  const [inviteName, setInviteName] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<FamilyRole>("parent");
+  const [acceptCode, setAcceptCode] = useState("");
+  const [message, setMessage] = useState("");
+  const [copied, setCopied] = useState("");
+  const [acceptingInvite, setAcceptingInvite] = useState(false);
+  const pending = cloudInvitations.length
+    ? cloudInvitations
+    : invitations.filter((item) => item.status === "pending");
+
+  const visibleMembers =
+    cloudMembers.length > 0
+      ? cloudMembers.map((member, index) => ({
+          id: member.profileId,
+          userId: member.profileId,
+          familyId: member.familyId,
+          role: member.role,
+          displayName: member.displayName,
+          email: member.email,
+          subscriptionPlan: member.subscriptionPlan,
+          avatarColor: (
+            ["indigo", "violet", "emerald", "amber", "rose", "sky"] as const
+          )[index % 6],
+          notificationPreferences: {
+            sleep: true,
+            feeding: true,
+            medication: true,
+            vaccination: true,
+          },
+          joinedAt: member.createdAt ?? new Date().toISOString(),
+        }))
+      : members;
+
+  useEffect(() => {
+    if (cloudMembers.length > 0) {
+      console.log("[BabyNest cloud family members]", cloudMembers);
+    }
+  }, [cloudMembers]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    familyService
+      .listMyFamilies()
+      .then(async (familyItems) => {
+        if (cancelled) {
+          return;
+        }
+
+        console.log(
+          "[BabyNest cloud families]",
+          familyItems.length,
+          familyItems,
+        );
+
+        setCloudFamilies(familyItems);
+
+        const activeCloudFamily =
+          familyItems.find((item) => item.id === family.id) ??
+          familyItems[0] ??
+          null;
+
+        if (!activeCloudFamily) {
+          setCloudInvitations([]);
+          setCloudMembers([]);
+          return;
+        }
+
+        if (activeCloudFamily.id !== family.id) {
+          useFamilyStore.getState().setActiveFamilyId(activeCloudFamily.id);
+        }
+
+        if (activeCloudFamily.name && activeCloudFamily.name !== family.name) {
+          useFamilyStore.getState().renameFamily(activeCloudFamily.name);
+        }
+
+        const [invitationItems, memberItems] = await Promise.all([
+          familyService.listPendingInvitations(activeCloudFamily.id),
+          familyService.listMembers(activeCloudFamily.id),
+        ]);
+
+        if (!cancelled) {
+          setCloudInvitations(invitationItems);
+          setCloudMembers(memberItems);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load cloud family", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [family.id]);
+
+  const premiumOwner =
+    cloudMembers.find((member) => member.subscriptionPlan === "premium") ??
+    null;
+  async function handleSwitchFamily(nextFamilyId: string) {
+    if (!nextFamilyId || nextFamilyId === family.id) {
+      return;
+    }
+
+    const nextFamily = cloudFamilies.find((item) => item.id === nextFamilyId);
+
+    if (!nextFamily) {
+      throw new Error("Selected family was not found.");
+    }
+
+    // Не показваме данните от старото семейство,
+    // докато новото се зарежда.
+    useBabyStore.getState().replaceBabies([]);
+
+    useActivityStore.setState({
+      activities: [],
+      activeActivity: null,
+    });
+
+    setCloudMembers([]);
+    setCloudInvitations([]);
+    setName(nextFamily.name);
+    setMessage("");
+
+    useFamilyStore.getState().setActiveFamily({
+      id: nextFamily.id,
+      name: nextFamily.name,
+    });
+
+    // Reset local UI immediately before cloud reload.
+    useBabyStore.getState().replaceBabies([]);
+
+    useActivityStore.setState({
+      activities: [],
+      activeActivity: null,
+    });
+
+    const [invitationItems, memberItems] = await Promise.all([
+      familyService.listPendingInvitations(nextFamily.id),
+      familyService.listMembers(nextFamily.id),
+    ]);
+
+    // Ако междувременно е избрано трето семейство,
+    // не записваме остарелия резултат.
+    if (useFamilyStore.getState().family.id !== nextFamily.id) {
+      return;
+    }
+
+    setCloudInvitations(invitationItems);
+
+    setCloudMembers(memberItems);
+  }
+
+  async function handleCreateFamily(familyName: string) {
+    const createdFamily = await familyService.createFamily(familyName);
+
+    useFamilyStore.getState().setActiveFamily({
+      id: createdFamily.id,
+      name: createdFamily.name,
+    });
+
+    const [refreshedFamilies, refreshedMembers] = await Promise.all([
+      familyService.listMyFamilies(),
+      familyService.listMembers(createdFamily.id),
+    ]);
+setCloudFamilies(refreshedFamilies);
+
+    setCloudMembers(refreshedMembers);
+
+    setCloudInvitations([]);
+
+    setMessage(t("family.familyCreated"));
+  }
+
+  const familyBody = (
+    <div className="space-y-6">
+      <CreateFamilyCard onCreate={handleCreateFamily} />
+      {cloudFamilies.length > 0 ? (
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+            {t("family.activeFamily")}
+
+            <select
+              value={family.id}
+              onChange={(event) => {
+                void handleSwitchFamily(event.target.value).catch((error) => {
+                  console.error("Failed to switch family", error);
+
+                  setMessage(
+                    error instanceof Error
+                      ? error.message
+                      : t("family.genericError"),
+                  );
+                });
+              }}
+              className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-600 dark:bg-slate-900"
+            >
+              {cloudFamilies.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} · {t(`family.roles.${item.role}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+      ) : null}
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <label className="min-w-0 flex-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            {t("family.familyName")}
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={!hasFamilyPermission(currentMember, "canManageBaby")}
+              className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-600 dark:bg-slate-900"
+            />
+          </label>
+          <button
+            onClick={() => rename(name)}
+            disabled={!hasFamilyPermission(currentMember, "canManageBaby")}
+            className="h-11 rounded-xl bg-indigo-600 px-5 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            {t("activity.save")}
+          </button>
+        </div>
+        <div className="mt-4 flex items-center gap-2 rounded-2xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+          <Crown className="h-4 w-4" />
+          {t("family.premiumOwner")}:{" "}
+          <strong>{premiumOwner?.displayName}</strong>
+        </div>
+      </section>
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold">{t("family.members")}</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {t("family.membersDescription")}
+            </p>
+          </div>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold dark:bg-slate-700">
+            {visibleMembers.length}
+          </span>
+        </div>
+        <div className="mt-5 space-y-3">
+          {visibleMembers.map((member) => (
+            <article
+              key={member.id}
+              className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"
+            >
+              <div className="flex flex-wrap items-start gap-3">
+                <span
+                  className={`flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-white ${colors[member.avatarColor] ?? colors.indigo}`}
+                >
+                  {member.displayName.slice(0, 2).toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <strong>{member.displayName}</strong>
+                    {member.id === currentMember?.profileId ? (
+                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                        {t("family.you")}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-sm text-slate-500">
+                    {member.email ?? t("family.localProfile")}
+                  </p>
+                </div>
+                <select
+                  aria-label={t("family.role")}
+                  value={member.role}
+                  disabled={!premium || !canInvite || member.role === "owner"}
+                  onChange={(e) =>
+                    updateRole(member.id, e.target.value as FamilyRole)
+                  }
+                  className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+                >
+                  {roles.map((value) => (
+                    <option key={value} value={value}>
+                      {t(`family.roles.${value}`)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {getFamilyPermissions(member).map((permission) => (
+                  <span
+                    key={permission}
+                    className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                  >
+                    {t(`family.permissions.${permission}`)}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-700">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {t("family.notifications")}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-3">
+                  {preferenceKeys.map((key) => (
+                    <label
+                      key={key}
+                      className="flex items-center gap-1.5 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={member.notificationPreferences[key]}
+                        disabled={member.id !== currentMember?.profileId}
+                        onChange={(e) =>
+                          updatePreferences(member.id, {
+                            ...member.notificationPreferences,
+                            [key]: e.target.checked,
+                          })
+                        }
+                      />
+                      {t(`family.preferences.${key}`)}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+      {premium && (
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
+          <div className="flex items-center gap-2">
+            <MailPlus className="h-5 w-5 text-indigo-600" />
+            <h2 className="text-xl font-bold">{t("family.invite")}</h2>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <input
+              aria-label={t("family.memberName")}
+              value={inviteName}
+              onChange={(e) => setInviteName(e.target.value)}
+              placeholder={t("family.memberName")}
+              className="h-11 rounded-xl border px-3 dark:border-slate-600 dark:bg-slate-900"
+            />
+            <input
+              aria-label={t("family.emailOptional")}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={t("family.emailOptional")}
+              className="h-11 rounded-xl border px-3 dark:border-slate-600 dark:bg-slate-900"
+            />
+            <select
+              aria-label={t("family.role")}
+              value={role}
+              onChange={(e) => setRole(e.target.value as FamilyRole)}
+              className="h-11 rounded-xl border px-3 dark:border-slate-600 dark:bg-slate-900"
+            >
+              {roles
+                .filter((value) => value !== "owner")
+                .map((value) => (
+                  <option key={value} value={value}>
+                    {t(`family.roles.${value}`)}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <button
+            disabled={!canInvite}
+            onClick={async () => {
+              try {
+                const invitation = await familyService.createInvitation({
+                  familyId: family.id,
+                  displayName: inviteName,
+                  email,
+                  role: role === "owner" ? "parent" : role,
+                });
+  
+                setCloudInvitations((current) => [invitation, ...current]);
+  
+                setMessage(
+                  t("family.inviteCreated", {
+                    code: invitation.inviteCode,
+                  }),
+                );
+  
+                setInviteName("");
+                setEmail("");
+              } catch (error) {
+                console.error(error);
+  
+                setMessage(t("family.genericError"));
+              }
+            }}
+            className="mt-3 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            {t("family.generateInvite")}
+          </button>
+          {message ? (
+            <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+              {message}
+            </p>
+          ) : null}
+          <div className="mt-5 space-y-2">
+            {pending.map((invitation) => (
+              <div
+                key={invitation.id}
+                className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-900"
+              >
+                <Clock3 className="h-4 w-4 text-slate-400" />
+                <span className="font-mono text-sm font-bold">
+                  {invitation.inviteCode ?? invitation.code}
+                </span>
+                <span className="text-sm text-slate-500">
+                  {invitation.displayName ||
+                    invitation.email ||
+                    t(`family.roles.${invitation.role}`)}
+                </span>
+                <button
+                  onClick={async () => {
+                    await navigator.clipboard?.writeText(
+                      `${window.location.origin}/family?invite=${invitation.inviteCode ?? invitation.code}`,
+                    );
+                    setCopied(invitation.id);
+                  }}
+                  className="ml-auto rounded-lg p-2 text-indigo-600"
+                  aria-label={t("family.copyLink")}
+                >
+                  {copied === invitation.id ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Clipboard className="h-4 w-4" />
+                  )}
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await familyService.revokeInvitation(invitation.id);
+  
+                      setCloudInvitations((current) =>
+                        current.filter((item) => item.id !== invitation.id),
+                      );
+                    } catch (error) {
+                      console.error("Failed to revoke invitation", error);
+                      setMessage(t("family.genericError"));
+                    }
+                  }}
+                  className="rounded-lg p-2 text-rose-600"
+                  aria-label={t("family.revoke")}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 flex gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <input
+              value={acceptCode}
+              onChange={(e) => setAcceptCode(e.target.value)}
+              placeholder={t("family.inviteCode")}
+              className="h-10 min-w-0 flex-1 rounded-xl border px-3 dark:border-slate-600 dark:bg-slate-900"
+            />
+            <button
+              disabled={acceptingInvite || !acceptCode.trim()}
+              onClick={async () => {
+                setAcceptingInvite(true);
+                setMessage("");
+  
+                try {
+                  const result = await familyService.acceptInvitation(acceptCode);
+  
+                  useFamilyStore.getState().setActiveFamilyId(result.familyId);
+  
+                  setAcceptCode("");
+                  setMessage(t("family.accepted"));
+  
+                  const [
+                    refreshedInvitations,
+                    refreshedMembers,
+                    refreshedFamilies,
+                  ] = await Promise.all([
+                    familyService.listPendingInvitations(result.familyId),
+                    familyService.listMembers(result.familyId),
+                    familyService.listMyFamilies(),
+                  ]);
+  
+                  setCloudInvitations(refreshedInvitations);
+  
+                  setCloudMembers(refreshedMembers);
+  setCloudFamilies(refreshedFamilies);
+  
+                  const joinedFamily = refreshedFamilies.find(
+                    (item) => item.id === result.familyId,
+                  );
+  
+                  if (joinedFamily?.name) {
+                    useFamilyStore.getState().renameFamily(joinedFamily.name);
+                  }
+                } catch (error) {
+                  console.error("Failed to accept family invitation", error);
+  
+                  setMessage(t("family.invalidCode"));
+                } finally {
+                  setAcceptingInvite(false);
+                }
+              }}
+              className="rounded-xl border border-indigo-200 px-4 text-sm font-semibold text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-800 dark:text-indigo-300"
+            >
+              {acceptingInvite ? "..." : t("family.accept")}
+            </button>
+          </div>
+        </section>
+      )}
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
+        <div className="flex items-center gap-2">
+          <History className="h-5 w-5 text-indigo-600" />
+          <h2 className="text-xl font-bold">{t("family.history")}</h2>
+        </div>
+        {audit.length ? (
+          <div className="mt-4 space-y-2">
+            {audit.map((entry) => {
+              const member = members.find((item) => item.id === entry.memberId);
+              return (
+                <div
+                  key={entry.id}
+                  className="flex gap-3 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-900"
+                >
+                  <UserRound className="h-4 w-4 shrink-0 text-slate-400" />
+                  <div>
+                    <p>
+                      <strong>
+                        {member?.displayName ?? t("family.unknownMember")}
+                      </strong>{" "}
+                      · {t(entry.descriptionKey, entry.metadata)}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {new Date(entry.createdAt).toLocaleString(i18n.language)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-slate-500">{t("family.noHistory")}</p>
+        )}
+      </section>
+    </div>
+  );
+  const joinFamilyCard = (
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
+        <div className="flex items-center gap-2">
+          <MailPlus className="h-5 w-5 text-indigo-600" />
+          <h2 className="text-xl font-bold">{t("family.joinFamily")}</h2>
+        </div>
+      
+        <p className="mt-2 text-sm text-slate-500">
+          {t("family.joinFamilyDescription")}
+        </p>
+      
+        <div className="mt-4 flex gap-2">
+          <input
+            value={acceptCode}
+            onChange={(event) => setAcceptCode(event.target.value)}
+            placeholder={t("family.inviteCode")}
+            className="h-10 min-w-0 flex-1 rounded-xl border px-3 dark:border-slate-600 dark:bg-slate-900"
+          />
+      
+          <button
+            disabled={acceptingInvite || !acceptCode.trim()}
+            onClick={async () => {
+              setAcceptingInvite(true);
+              setMessage("");
+      
+              try {
+                const result = await familyService.acceptInvitation(acceptCode);
+      
+                useFamilyStore.getState().setActiveFamilyId(result.familyId);
+      
+                setAcceptCode("");
+                setMessage(t("family.accepted"));
+      
+                const [
+                  refreshedInvitations,
+                  refreshedMembers,
+                  refreshedFamilies,
+                ] = await Promise.all([
+                  familyService.listPendingInvitations(result.familyId),
+                  familyService.listMembers(result.familyId),
+                  familyService.listMyFamilies(),
+                ]);
+      
+                setCloudInvitations(refreshedInvitations);
+                setCloudMembers(refreshedMembers);
+                setCloudFamilies(refreshedFamilies);
+      
+                const joinedFamily = refreshedFamilies.find(
+                  (item) => item.id === result.familyId,
+                );
+      
+                if (joinedFamily?.name) {
+                  useFamilyStore.getState().renameFamily(joinedFamily.name);
+                }
+              } catch (error) {
+                console.error("Failed to accept family invitation", error);
+      
+                setMessage(t("family.invalidCode"));
+              } finally {
+                setAcceptingInvite(false);
+              }
+            }}
+            className="rounded-xl border border-indigo-200 px-4 text-sm font-semibold text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-800 dark:text-indigo-300"
+          >
+            {acceptingInvite ? "..." : t("family.accept")}
+          </button>
+        </div>
+      
+        {message ? (
+          <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+            {message}
+          </p>
+        ) : null}
+      </section>
+  );
+
+  return (
+    <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <section className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-indigo-700 via-violet-700 to-fuchsia-600 p-6 text-white sm:p-8">
+        <div className="flex items-center gap-3">
+          <Users className="h-9 w-9" />
+          <ShieldCheck className="h-7 w-7 text-violet-200" />
+        </div>
+
+        <h1 className="mt-4 text-3xl font-bold sm:text-4xl">
+          {t("family.title")}
+        </h1>
+
+        <p className="mt-2 max-w-2xl text-indigo-100">
+          {t("family.description")}
+        </p>
+      </section>
+
+      {joinFamilyCard}
+
+      {familyBody}
+    </main>
+  );
+}

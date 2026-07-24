@@ -1,0 +1,11 @@
+import type { Table } from "dexie";
+import type { Activity } from "../../entities/activity/model/activity.types";
+import type { Baby } from "../../entities/baby/model/baby.types";
+import type { Family, FamilyMember } from "../../features/family/model/family.types";
+import { babyNestDb } from "../../lib/local-db/babyNestDb";
+import type { LocalEntity } from "../../lib/local-db/localDb.types";
+import { createLocalRepository } from "./createLocalRepository";
+export const localFamilyRepository=createLocalRepository(babyNestDb.families as unknown as Table<LocalEntity<Family>,string>,"family",value=>value.id);
+export const localFamilyMemberRepository=createLocalRepository(babyNestDb.familyMembers as unknown as Table<LocalEntity<FamilyMember>,string>,"familyMember",value=>value.familyId);
+export const localBabyRepository=createLocalRepository(babyNestDb.babies as unknown as Table<LocalEntity<Baby>,string>,"baby",value=>value.familyId);
+export const localActivityRepository=createLocalRepository(babyNestDb.activities as unknown as Table<LocalEntity<Activity>,string>,"activity",value=>value.familyId);

@@ -1,9 +1,4 @@
-import {
-  Check,
-  Crown,
-  LayoutDashboard,
-  Sparkles,
-} from "lucide-react";
+import { Check, Crown, LayoutDashboard, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -34,22 +29,15 @@ export default function PlansPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  const plan = useSubscriptionStore(
-    (state) => state.plan,
-  );
+  const plan = useSubscriptionStore((state) => state.plan);
 
-  const setPlan = useSubscriptionStore(
-    (state) => state.setPlan,
-  );
+  const setPlan = useSubscriptionStore((state) => state.setPlan);
 
-  const [billingPeriod, setBillingPeriod] =
-    useState<BillingPeriod>("monthly");
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
 
   const [message, setMessage] = useState("");
 
-  function activatePlan(
-    selectedPlan: "free" | "premium",
-  ) {
+  function activatePlan(selectedPlan: "free" | "premium") {
     if (selectedPlan === "premium") {
       setMessage(t("premium.demoUpgradeNote"));
       return;
@@ -70,9 +58,7 @@ export default function PlansPage() {
       : t("plans.premiumYearlyPrice");
 
   const premiumPeriod =
-    billingPeriod === "monthly"
-      ? t("plans.perMonth")
-      : t("plans.perYear");
+    billingPeriod === "monthly" ? t("plans.perMonth") : t("plans.perYear");
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
@@ -102,9 +88,7 @@ export default function PlansPage() {
           <div className="mt-6 inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
             <button
               type="button"
-              onClick={() =>
-                setBillingPeriod("monthly")
-              }
+              onClick={() => setBillingPeriod("monthly")}
               className={[
                 "rounded-xl px-5 py-2.5 text-sm font-semibold transition",
                 billingPeriod === "monthly"
@@ -117,9 +101,7 @@ export default function PlansPage() {
 
             <button
               type="button"
-              onClick={() =>
-                setBillingPeriod("yearly")
-              }
+              onClick={() => setBillingPeriod("yearly")}
               className={[
                 "flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition",
                 billingPeriod === "yearly"
@@ -151,9 +133,7 @@ export default function PlansPage() {
               </p>
 
               <div className="mt-4 flex items-end gap-2">
-                <p className="text-4xl font-bold">
-                  {t("plans.freePrice")}
-                </p>
+                <p className="text-4xl font-bold">{t("plans.freePrice")}</p>
               </div>
 
               <p className="mt-3 text-sm leading-6 text-slate-500">
@@ -163,18 +143,13 @@ export default function PlansPage() {
 
             <div className="mt-7 space-y-3">
               {freeFeatureKeys.map((featureKey) => (
-                <div
-                  key={featureKey}
-                  className="flex items-start gap-3"
-                >
+                <div key={featureKey} className="flex items-start gap-3">
                   <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700">
                     <Check className="h-3.5 w-3.5" />
                   </div>
 
                   <span className="text-sm text-slate-600">
-                    {t(
-                      `plans.features.${featureKey}`,
-                    )}
+                    {t(`plans.features.${featureKey}`)}
                   </span>
                 </div>
               ))}
@@ -206,13 +181,9 @@ export default function PlansPage() {
               </div>
 
               <div className="mt-4 flex flex-wrap items-end gap-x-2 gap-y-1">
-                <p className="text-4xl font-bold">
-                  {premiumPrice}
-                </p>
+                <p className="text-4xl font-bold">{premiumPrice}</p>
 
-                <p className="pb-1 text-sm text-slate-500">
-                  {premiumPeriod}
-                </p>
+                <p className="pb-1 text-sm text-slate-500">{premiumPeriod}</p>
               </div>
 
               <p className="mt-3 text-sm leading-6 text-slate-500">
@@ -222,18 +193,13 @@ export default function PlansPage() {
 
             <div className="mt-7 grid gap-3 sm:grid-cols-2">
               {premiumFeatureKeys.map((featureKey) => (
-                <div
-                  key={featureKey}
-                  className="flex items-start gap-3"
-                >
+                <div key={featureKey} className="flex items-start gap-3">
                   <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700">
                     <Check className="h-3.5 w-3.5" />
                   </div>
 
                   <span className="text-sm text-slate-600">
-                    {t(
-                      `plans.features.${featureKey}`,
-                    )}
+                    {t(`plans.features.${featureKey}`)}
                   </span>
                 </div>
               ))}
@@ -242,9 +208,7 @@ export default function PlansPage() {
             <div className="mt-auto pt-8">
               <button
                 type="button"
-                onClick={() =>
-                  activatePlan("premium")
-                }
+                onClick={() => activatePlan("premium")}
                 disabled={plan === "premium"}
                 className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-500 px-6 font-semibold text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-default disabled:opacity-60 disabled:hover:translate-y-0"
               >

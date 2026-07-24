@@ -24,13 +24,15 @@ export default function PremiumGate({
 }: PremiumGateProps) {
   const { t } = useTranslation();
 
-  const plan = useSubscriptionStore(
-    (state) => state.plan,
-  );
+  const effectivePlan =
+    useSubscriptionStore(
+      (state) =>
+        state.effectivePlan,
+    );
 
   const navigate = useNavigate();
 
-  if (plan === "premium") {
+  if (effectivePlan === "premium") {
     return <>{children}</>;
   }
 

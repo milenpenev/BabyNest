@@ -1,46 +1,106 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import { hasFamilyPermission } from "../features/family/permissions/familyPermissions";
-import { getCurrentFamilyMember } from "./familyStore";
 
-const canManagePremium = () => hasFamilyPermission(getCurrentFamilyMember(), "canManagePremium");
+import { getFamilySubscription } from "../features/premium/services/familySubscriptionService";
 
 export type SubscriptionPlan = "free" | "premium";
 
 interface SubscriptionStore {
+  /**
+   * effectivePlan е реалният план за семейството
+   * на текущо избраното бебе.
+   */
+  effectivePlan: SubscriptionPlan;
+
+  /**
+   * Временен compatibility alias.
+   * Ще бъде премахнат, след като всички компоненти
+   * преминат към effectivePlan.
+   */
   plan: SubscriptionPlan;
+  familyId: string | null;
+  loading: boolean;
+  error: string | null;
 
   isPremium: () => boolean;
+
+  /**
+   * Използва се само от съществуващите dev/test UI контроли.
+   */
   setPlan: (plan: SubscriptionPlan) => void;
-  enablePremium: () => void;
-  disablePremium: () => void;
+
+  refreshForFamily: (familyId: string | null) => Promise<void>;
+  reset: () => void;
 }
 
-export const useSubscriptionStore =
-  create<SubscriptionStore>()(
-    persist(
-      (set, get) => ({
+export const useSubscriptionStore = create<SubscriptionStore>()((set, get) => ({
+  effectivePlan: "free",
+  plan: "free",
+  familyId: null,
+  loading: false,
+  error: null,
+
+  isPremium: () => get().effectivePlan === "premium",
+
+  setPlan: (plan) =>
+    set({
+      effectivePlan: plan,
+      plan,
+    }),
+
+  refreshForFamily: async (familyId) => {
+    if (!familyId) {
+      set({
+        effectivePlan: "free",
         plan: "free",
+        familyId: null,
+        loading: false,
+        error: null,
+      });
+      return;
+    }
 
-        isPremium: () => get().plan === "premium",
+    set({
+      familyId,
+      loading: true,
+      error: null,
+    });
 
-        setPlan: (plan) => {
-          if (!canManagePremium()) return;
-          set({ plan });
-        },
+    try {
+      const plan = await getFamilySubscription(familyId);
 
-        enablePremium: () => {
-          if (!canManagePremium()) return;
-          set({ plan: "premium" });
-        },
+      if (get().familyId !== familyId) {
+        return;
+      }
 
-        disablePremium: () => {
-          if (!canManagePremium()) return;
-          set({ plan: "free" });
-        },
-      }),
-      {
-        name: "babynest-subscription",
-      },
-    ),
-  );
+      set({
+        effectivePlan: plan,
+        plan,
+        loading: false,
+        error: null,
+      });
+    } catch (error) {
+      if (get().familyId !== familyId) {
+        return;
+      }
+
+      set({
+        effectivePlan: "free",
+        plan: "free",
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to load subscription.",
+      });
+    }
+  },
+
+  reset: () =>
+    set({
+      effectivePlan: "free",
+      plan: "free",
+      familyId: null,
+      loading: false,
+      error: null,
+    }),
+}));

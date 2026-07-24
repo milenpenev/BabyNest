@@ -17,6 +17,7 @@ export type BathType =
 type ActivityBase = {
   id: string;
   babyId: string;
+  familyId?: string;
   createdBy?: string;
   updatedBy?: string;
   startedAt: string;

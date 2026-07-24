@@ -74,6 +74,23 @@ function splitIntervalByLocalDay(start: Date, end: Date) {
   return pieces;
 }
 
+/**
+ * Older BabyNest versions could persist an overnight end clock on the same
+ * calendar date as the start (for example 22:00 -> 07:00). Keep those records
+ * visible and editable by interpreting only that narrow legacy shape as the
+ * following local day. Equal clocks are intentionally not repaired because
+ * they represent an invalid/ambiguous 24-hour range.
+ */
+export function resolveSleepEnd(start: Date, storedEnd: Date) {
+  if (storedEnd.getTime() >= start.getTime()) return storedEnd;
+  if (localDayKey(storedEnd) !== localDayKey(start)) return storedEnd;
+
+  const repaired = new Date(storedEnd);
+  repaired.setDate(repaired.getDate() + 1);
+  const duration = repaired.getTime() - start.getTime();
+  return duration > 0 && duration < 24 * 60 * 60 * 1000 ? repaired : storedEnd;
+}
+
 function rawPeriodSeconds(start: Date, end: Date): SleepPeriodBreakdown {
   let cursor = new Date(start);
   let daySleepSeconds = 0;
@@ -106,7 +123,8 @@ export function splitSleepActivityByLocalDay(
   temporaryEnd?: Date,
 ): SleepDaySegment[] {
   const start = new Date(activity.startedAt);
-  const end = activity.endedAt ? new Date(activity.endedAt) : temporaryEnd;
+  const storedEnd = activity.endedAt ? new Date(activity.endedAt) : temporaryEnd;
+  const end = storedEnd && activity.endedAt ? resolveSleepEnd(start, storedEnd) : storedEnd;
   if (!end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end.getTime() <= start.getTime()) return [];
 
   const pieces = splitIntervalByLocalDay(start, end);

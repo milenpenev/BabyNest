@@ -7,11 +7,38 @@ import type {
 } from "../entities/activity/model/activity.types";
 import { hasFamilyPermission } from "../features/family/permissions/familyPermissions";
 import { getCurrentFamilyMember, useFamilyStore } from "./familyStore";
+import { localActivityRepository } from "../data/local/repositories";
 
-function activityEntity(type: ActivityType) { return type === "growth" ? "growth" as const : "activity" as const; }
-function can(permission: "canEditActivities" | "canDeleteActivities") { return hasFamilyPermission(getCurrentFamilyMember(), permission); }
-function canMutate(activity: Pick<Activity,"type">, permission: "canEditActivities" | "canDeleteActivities") { return can(permission) && (activity.type !== "growth" || hasFamilyPermission(getCurrentFamilyMember(), "canManageGrowth")); }
-function audit(activity: Activity, action: "created" | "updated" | "deleted") { const member = getCurrentFamilyMember(); if (!member) return; useFamilyStore.getState().addAudit({ memberId: member.id, action, entityType: activityEntity(activity.type), entityId: activity.id, descriptionKey: `family.audit.activity.${action}`, metadata: { type: activity.type } }); }
+function activityEntity(type: ActivityType) {
+  return type === "growth" ? ("growth" as const) : ("activity" as const);
+}
+function can(permission: "canEditActivities" | "canDeleteActivities") {
+  return hasFamilyPermission(getCurrentFamilyMember(), permission);
+}
+function canMutate(
+  activity: Pick<Activity, "type">,
+  permission: "canEditActivities" | "canDeleteActivities",
+) {
+  return (
+    can(permission) &&
+    (activity.type !== "growth" ||
+      hasFamilyPermission(getCurrentFamilyMember(), "canManageGrowth"))
+  );
+}
+function audit(activity: Activity, action: "created" | "updated" | "deleted") {
+  const member = getCurrentFamilyMember();
+  if (!member) return;
+  useFamilyStore
+    .getState()
+    .addAudit({
+      memberId: member.id,
+      action,
+      entityType: activityEntity(activity.type),
+      entityId: activity.id,
+      descriptionKey: `family.audit.activity.${action}`,
+      metadata: { type: activity.type },
+    });
+}
 
 export interface ActiveActivity {
   id: string;
@@ -61,7 +88,13 @@ export const useActivityStore = create<ActivityStore>()(
       addActivity: (activity) => {
         if (!canMutate(activity, "canEditActivities")) return;
         const member = getCurrentFamilyMember();
-        const attributed = { ...activity, createdBy: activity.createdBy ?? member?.id, updatedBy: member?.id } as Activity;
+        const attributed = {
+          ...activity,
+          familyId: activity.familyId ?? useFamilyStore.getState().family.id,
+          createdBy: activity.createdBy ?? member?.id,
+          updatedBy: member?.id,
+        } as Activity;
+        void localActivityRepository.create(attributed);
         set((state) => ({ activities: [...state.activities, attributed] }));
         audit(attributed, "created");
       },
@@ -71,7 +104,10 @@ export const useActivityStore = create<ActivityStore>()(
           (activity) => activity.id === id,
         );
 
-        if (!existingActivity || !canMutate(existingActivity, "canEditActivities")) {
+        if (
+          !existingActivity ||
+          !canMutate(existingActivity, "canEditActivities")
+        ) {
           return false;
         }
 
@@ -92,15 +128,27 @@ export const useActivityStore = create<ActivityStore>()(
           ),
         }));
 
+        void localActivityRepository.create({
+          ...existingActivity,
+          ...updates,
+          updatedBy: getCurrentFamilyMember()?.id,
+          updatedAt: new Date().toISOString(),
+        } as Activity);
+
         audit(existingActivity, "updated");
 
         return true;
       },
 
       removeActivity: (id) => {
-        const existing = get().activities.find((activity) => activity.id === id);
+        const existing = get().activities.find(
+          (activity) => activity.id === id,
+        );
         if (!existing || !canMutate(existing, "canDeleteActivities")) return;
-        set((state) => ({ activities: state.activities.filter((activity) => activity.id !== id) }));
+        void localActivityRepository.softDelete(id);
+        set((state) => ({
+          activities: state.activities.filter((activity) => activity.id !== id),
+        }));
         audit(existing, "deleted");
       },
 
@@ -109,16 +157,15 @@ export const useActivityStore = create<ActivityStore>()(
           activities: [],
           activeActivity: null,
         }),
-      replaceActivities: (activities) => set({ activities, activeActivity: null }),
+      replaceActivities: (activities) =>
+        set({ activities, activeActivity: null }),
 
       startActivity: ({ babyId, type, startedAt }) => {
         if (get().activeActivity || !can("canEditActivities")) {
           return false;
         }
 
-        const requestedStart = startedAt
-          ? new Date(startedAt)
-          : new Date();
+        const requestedStart = startedAt ? new Date(startedAt) : new Date();
 
         if (
           Number.isNaN(requestedStart.getTime()) ||
@@ -127,16 +174,29 @@ export const useActivityStore = create<ActivityStore>()(
           return false;
         }
 
-        set({
-          activeActivity: {
-            id: crypto.randomUUID(),
-            babyId,
-            type,
-            startedAt: requestedStart.toISOString(),
+        const activeActivity = {
+          id: crypto.randomUUID(),
+          babyId,
+          type,
+          startedAt: requestedStart.toISOString(),
+          pausedAt: null,
+          totalPausedMilliseconds: 0,
+        };
+        set({ activeActivity });
+        const timestamp = new Date().toISOString();
+        void localActivityRepository.create({
+          id: activeActivity.id,
+          babyId,
+          type: "sleep",
+          startedAt: activeActivity.startedAt,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          data: {
+            pausedDurationSeconds: 0,
             pausedAt: null,
             totalPausedMilliseconds: 0,
           },
-        });
+        } as Activity);
 
         return true;
       },
@@ -158,19 +218,32 @@ export const useActivityStore = create<ActivityStore>()(
           : new Date();
 
         if (
-          requestedStart.getTime() +
-            activeActivity.totalPausedMilliseconds >
+          requestedStart.getTime() + activeActivity.totalPausedMilliseconds >
           effectiveEnd.getTime()
         ) {
           return false;
         }
 
-        set({
-          activeActivity: {
-            ...activeActivity,
-            startedAt: requestedStart.toISOString(),
+        const updated = {
+          ...activeActivity,
+          startedAt: requestedStart.toISOString(),
+        };
+        set({ activeActivity: updated });
+        void localActivityRepository.create({
+          id: updated.id,
+          babyId: updated.babyId,
+          type: "sleep",
+          startedAt: updated.startedAt,
+          createdAt: updated.startedAt,
+          updatedAt: new Date().toISOString(),
+          data: {
+            pausedAt: updated.pausedAt,
+            totalPausedMilliseconds: updated.totalPausedMilliseconds,
+            pausedDurationSeconds: Math.floor(
+              updated.totalPausedMilliseconds / 1000,
+            ),
           },
-        });
+        } as Activity);
 
         return true;
       },
@@ -182,12 +255,26 @@ export const useActivityStore = create<ActivityStore>()(
           return;
         }
 
-        set({
-          activeActivity: {
-            ...activeActivity,
-            pausedAt: new Date().toISOString(),
+        const updated = {
+          ...activeActivity,
+          pausedAt: new Date().toISOString(),
+        };
+        set({ activeActivity: updated });
+        void localActivityRepository.create({
+          id: updated.id,
+          babyId: updated.babyId,
+          type: "sleep",
+          startedAt: updated.startedAt,
+          createdAt: updated.startedAt,
+          updatedAt: new Date().toISOString(),
+          data: {
+            pausedAt: updated.pausedAt,
+            totalPausedMilliseconds: updated.totalPausedMilliseconds,
+            pausedDurationSeconds: Math.floor(
+              updated.totalPausedMilliseconds / 1000,
+            ),
           },
-        });
+        } as Activity);
       },
 
       resumeActivity: () => {
@@ -205,15 +292,28 @@ export const useActivityStore = create<ActivityStore>()(
           resumedAt.getTime() - pausedAt.getTime(),
         );
 
-        set({
-          activeActivity: {
-            ...activeActivity,
+        const updated = {
+          ...activeActivity,
+          pausedAt: null,
+          totalPausedMilliseconds:
+            activeActivity.totalPausedMilliseconds + pausedMilliseconds,
+        };
+        set({ activeActivity: updated });
+        void localActivityRepository.create({
+          id: updated.id,
+          babyId: updated.babyId,
+          type: "sleep",
+          startedAt: updated.startedAt,
+          createdAt: updated.startedAt,
+          updatedAt: new Date().toISOString(),
+          data: {
             pausedAt: null,
-            totalPausedMilliseconds:
-              activeActivity.totalPausedMilliseconds +
-              pausedMilliseconds,
+            totalPausedMilliseconds: updated.totalPausedMilliseconds,
+            pausedDurationSeconds: Math.floor(
+              updated.totalPausedMilliseconds / 1000,
+            ),
           },
-        });
+        } as Activity);
       },
 
       finishActivity: () => {
@@ -228,14 +328,12 @@ export const useActivityStore = create<ActivityStore>()(
         const currentPauseMilliseconds = activeActivity.pausedAt
           ? Math.max(
               0,
-              endedAt.getTime() -
-                new Date(activeActivity.pausedAt).getTime(),
+              endedAt.getTime() - new Date(activeActivity.pausedAt).getTime(),
             )
           : 0;
 
         const totalPausedMilliseconds =
-          activeActivity.totalPausedMilliseconds +
-          currentPauseMilliseconds;
+          activeActivity.totalPausedMilliseconds + currentPauseMilliseconds;
 
         const activeMilliseconds = Math.max(
           0,
@@ -250,9 +348,7 @@ export const useActivityStore = create<ActivityStore>()(
           totalPausedMilliseconds,
           endedAt: endedAt.toISOString(),
           durationSeconds: Math.floor(activeMilliseconds / 1000),
-          pausedDurationSeconds: Math.floor(
-            totalPausedMilliseconds / 1000,
-          ),
+          pausedDurationSeconds: Math.floor(totalPausedMilliseconds / 1000),
         };
 
         set({
@@ -262,17 +358,26 @@ export const useActivityStore = create<ActivityStore>()(
         return finishedActivity;
       },
 
-      cancelActiveActivity: () =>
-        set({
-          activeActivity: null,
-        }),
+      cancelActiveActivity: () => {
+        const active = get().activeActivity;
+        if (active) void localActivityRepository.softDelete(active.id);
+        set({ activeActivity: null });
+      },
     }),
     {
       name: "babynest-activities",
       version: 2,
       migrate: (persisted) => {
         const state = persisted as Partial<ActivityStore> | undefined;
-        return { ...state, activities: (state?.activities ?? []).map((activity) => ({ ...activity, createdBy: activity.createdBy ?? "local-owner-member", updatedBy: activity.updatedBy ?? activity.createdBy ?? "local-owner-member" })) };
+        return {
+          ...state,
+          activities: (state?.activities ?? []).map((activity) => ({
+            ...activity,
+            createdBy: activity.createdBy ?? "local-owner-member",
+            updatedBy:
+              activity.updatedBy ?? activity.createdBy ?? "local-owner-member",
+          })),
+        };
       },
     },
   ),

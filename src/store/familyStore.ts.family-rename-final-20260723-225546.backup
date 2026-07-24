@@ -1,0 +1,51 @@
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { Family, FamilyAuditEntry, FamilyInvitation, FamilyMember, FamilyRole, MemberNotificationPreferences } from "../features/family/model/family.types";
+import { LOCAL_USER_ID } from "./currentUserStore";
+import { useCurrentUserStore } from "./currentUserStore";
+const familyId = "local-family"; const ownerMemberId = "local-owner-member"; const now = new Date().toISOString();
+const defaults: MemberNotificationPreferences = { feeding: true, medication: true, vaccination: true, sleep: true };
+const defaultFamily: Family = { id: familyId, name: "My family", premiumOwnerMemberId: ownerMemberId, createdAt: now, updatedAt: now };
+const defaultOwner: FamilyMember = { id: ownerMemberId, familyId, userId: LOCAL_USER_ID, displayName: "Parent", role: "owner", avatarColor: "indigo", notificationPreferences: defaults, joinedAt: now };
+interface FamilyStore { family: Family; members: FamilyMember[]; invitations: FamilyInvitation[]; audit: FamilyAuditEntry[]; renameFamily: (name: string) => void; createInvitation: (input: { email?: string; displayName?: string; role: FamilyRole }) => FamilyInvitation; acceptInvitation: (code: string, userId: string, fallbackName: string) => boolean; revokeInvitation: (id: string) => void; updateMemberRole: (id: string, role: FamilyRole) => void; updatePreferences: (id: string, preferences: MemberNotificationPreferences) => void; setActiveFamily: (family: { id: string; name: string }) => void; setActiveFamilyId: (familyId: string) => void; addAudit: (entry: Omit<FamilyAuditEntry,"id"|"createdAt"|"familyId">) => void; }
+export const useFamilyStore = create<FamilyStore>()(persist((set, get) => ({
+  family: defaultFamily, members: [defaultOwner], invitations: [], audit: [],
+  renameFamily: (name) => { set((state) => ({ family: { ...state.family, name: name.trim() || state.family.name, updatedAt: new Date().toISOString() } })); get().addAudit({ memberId: getCurrentFamilyMember()?.id ?? ownerMemberId, action: "updated", entityType: "family", entityId: get().family.id, descriptionKey: "family.audit.family.updated" }); },
+  createInvitation: (input) => { const invitation: FamilyInvitation = { id: crypto.randomUUID(), familyId: get().family.id, code: crypto.randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase(), invitedByMemberId: ownerMemberId, email: input.email?.trim() || undefined, displayName: input.displayName?.trim() || undefined, role: input.role, status: "pending", createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString() }; set((state) => ({ invitations: [invitation, ...state.invitations] })); get().addAudit({ memberId: ownerMemberId, action: "invited", entityType: "invitation", entityId: invitation.id, descriptionKey: "family.audit.invited", metadata: { role: invitation.role } }); return invitation; },
+  acceptInvitation: (code, userId, fallbackName) => { const invitation = get().invitations.find((item) => item.code.toUpperCase() === code.trim().toUpperCase() && item.status === "pending" && new Date(item.expiresAt) > new Date()); if (!invitation) return false; const member: FamilyMember = { id: crypto.randomUUID(), familyId: invitation.familyId, userId, displayName: invitation.displayName || fallbackName, email: invitation.email, role: invitation.role, avatarColor: "violet", notificationPreferences: defaults, joinedAt: new Date().toISOString() }; set((state) => ({ members: [...state.members, member], invitations: state.invitations.map((item) => item.id === invitation.id ? { ...item, status: "accepted", acceptedAt: new Date().toISOString() } : item) })); get().addAudit({ memberId: member.id, action: "joined", entityType: "member", entityId: member.id, descriptionKey: "family.audit.joined", metadata: { name: member.displayName } }); return true; },
+  revokeInvitation: (id) => set((state) => ({ invitations: state.invitations.map((item) => item.id === id ? { ...item, status: "revoked" } : item) })),
+  updateMemberRole: (id, role) => { set((state) => ({ members: state.members.map((item) => item.id === id ? { ...item, role } : item) })); get().addAudit({ memberId: getCurrentFamilyMember()?.id ?? ownerMemberId, action: "updated", entityType: "member", entityId: id, descriptionKey: "family.audit.member.updated", metadata: { role } }); },
+  updatePreferences: (id, notificationPreferences) => { set((state) => ({ members: state.members.map((item) => item.id === id ? { ...item, notificationPreferences } : item) })); get().addAudit({ memberId: id, action: "preferences-updated", entityType: "member", entityId: id, descriptionKey: "family.audit.preferences" }); },
+  setActiveFamily: (nextFamily) => {
+    if (!nextFamily.id.trim()) return;
+
+    set((state) => ({
+      family: {
+        ...state.family,
+        id: nextFamily.id,
+        name: nextFamily.name.trim() || state.family.name,
+        updatedAt: new Date().toISOString(),
+      },
+
+      // Локалните записи от старото семейство не трябва да бъдат
+      // прехвърляни към новото семейство.
+      members: [],
+      invitations: [],
+      audit: [],
+    }));
+  },
+
+  setActiveFamilyId: (nextFamilyId) => {
+    if (!nextFamilyId.trim()) return;
+
+    set((state) => ({
+      family: {
+        ...state.family,
+        id: nextFamilyId,
+        updatedAt: new Date().toISOString(),
+      },
+    }));
+  },
+  addAudit: (entry) => set((state) => ({ audit: [{ ...entry, id: crypto.randomUUID(), familyId: state.family.id, createdAt: new Date().toISOString() }, ...state.audit].slice(0, 250) })),
+}), { name: "babynest-family", version: 1 }));
+export function getCurrentFamilyMember() { const userId = useCurrentUserStore.getState().currentUser.id; return useFamilyStore.getState().members.find((item) => item.userId === userId) ?? null; }
