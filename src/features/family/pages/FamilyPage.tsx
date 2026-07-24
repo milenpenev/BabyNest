@@ -717,64 +717,7 @@ setCloudFamilies(refreshedFamilies);
                 </button>
               </div>
             ))}
-          </div>
-          <div className="mt-5 flex gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
-            <input
-              value={acceptCode}
-              onChange={(e) => setAcceptCode(e.target.value)}
-              placeholder={t("family.inviteCode")}
-              className="h-10 min-w-0 flex-1 rounded-xl border px-3 dark:border-slate-600 dark:bg-slate-900"
-            />
-            <button
-              disabled={acceptingInvite || !acceptCode.trim()}
-              onClick={async () => {
-                setAcceptingInvite(true);
-                setMessage("");
-  
-                try {
-                  const result = await familyService.acceptInvitation(acceptCode);
-  
-                  useFamilyStore.getState().setActiveFamilyId(result.familyId);
-  
-                  setAcceptCode("");
-                  setMessage(t("family.accepted"));
-  
-                  const [
-                    refreshedInvitations,
-                    refreshedMembers,
-                    refreshedFamilies,
-                  ] = await Promise.all([
-                    familyService.listPendingInvitations(result.familyId),
-                    familyService.listMembers(result.familyId),
-                    familyService.listMyFamilies(),
-                  ]);
-  
-                  setCloudInvitations(refreshedInvitations);
-  
-                  setCloudMembers(refreshedMembers);
-  setCloudFamilies(refreshedFamilies);
-  
-                  const joinedFamily = refreshedFamilies.find(
-                    (item) => item.id === result.familyId,
-                  );
-  
-                  if (joinedFamily?.name) {
-                    useFamilyStore.getState().renameFamily(joinedFamily.name);
-                  }
-                } catch (error) {
-                  console.error("Failed to accept family invitation", error);
-  
-                  setMessage(t("family.invalidCode"));
-                } finally {
-                  setAcceptingInvite(false);
-                }
-              }}
-              className="rounded-xl border border-indigo-200 px-4 text-sm font-semibold text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-800 dark:text-indigo-300"
-            >
-              {acceptingInvite ? "..." : t("family.accept")}
-            </button>
-          </div>
-        </section>
+          </div>        </section>
       ) : (
         <section className="rounded-3xl border border-indigo-200 bg-indigo-50/60 p-5 shadow-sm dark:border-indigo-900 dark:bg-indigo-950/30 sm:p-6">
           <div className="flex items-center justify-between gap-3">
